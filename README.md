@@ -1,5 +1,5 @@
 # prodromos
-Prodromus public repository
+Prodromos public repository
 
 This is the open-source code for a DOE ENERGISE project. 
 

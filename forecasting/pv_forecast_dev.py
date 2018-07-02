@@ -214,27 +214,84 @@ def calc_ratio(X, Y):
     return ratio
 
 
-def _align_data_to_forecast(start, end, deltat, history, target_offset):
+def _extend_datetime_index(start, end, deltat, earlier):
     """
+    Extends a datetime index from  ``start`` to ``end`` at
+    interval ``deltat`` to begin prior to ``earlier`` time.
+    
+    Parameters
+    -------------
+    start : datetime
+        the start time for the datetime index
+        
+    end : datetime
+        the end time for the datetime index
+        
+    deltat : timedelta
+        the time interval for the datetime index
+    
+    earlier : datetime
+        earlier time to include in the extended datetime index
+        
+    Returns
+    ------------
+    idr : DateTimeIndex
+        start replaced by earlier time, time interval and end time maintained
+        
+    """
+    if earlier > start:
+        raise Exception("Error in _extend_datetime_index: earlier > start")
+        return
+    
+    # number of intervals with length deltat between start of input
+    # datetime index and the earlier time to be included
+    num_intervals = int(
+              (start - earlier).total_seconds() / deltat.seconds)
 
+    # extend datetime index to include earlier time
+    idr = pd.DatetimeIndex(start=(start - num_intervals*deltat),
+                           end=end,
+                           freq=pd.to_timedelta(deltat))
+
+    return idr
+
+    
+def _align_data_to_forecast(fstart, fend, deltat, history):
+    """
+    Interpolate history to times that are in phase with forecast
+    
+    Parameters
+    -----------
+    fstart : datetime
+        first time for the forecast
+        
+    fend : datetime
+        end time for the forecast
+    
+    deltat : timedelta
+        interval for the forecast
+    
+    history : pandas Series or DataFrame containing key 'ac_power'
+        measurements to use for the forecast
+        
     Returns
     ---------
     idata : pandas DataFrame
-
+        contains history interpolated to times that are in phase with requested
+        forecast times
+        
+    idr : pandas DatetimeIndex
+        datetime index that includes history and forecast periods and is in
+        phase with forecast times
+        
     """
-    # number of intervals with length deltat between start of history and
-    # start of forecast
-    num_intervals = int(
-              (fstart - min(history.index)).total_seconds() / deltat.seconds)
-
-    # interpolate history to new datetime index idr with interval deltat
-    # and starting in phase with forecast
-    idr = pd.DatetimeIndex(fstart - num_intervals*deltat,
-                           end=end,
-                           freq=target_offset)
+    
+    idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
+    
     tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'])
 
-    # merge history with empty dataframe that has the index we want
+    # merge history into empty dataframe that has the index we want
+    # use outer join to retain time points in history
     newdata = tmpdata.merge(history.to_frame(),
                             how='outer',
                             on=['ac_power'],
@@ -254,7 +311,7 @@ def _align_data_to_forecast(start, end, deltat, history, target_offset):
                 idr[0].normalize()).total_seconds() / 60)
 
     # want time averages in phase with forecast start over specified deltat.
-    idata = idata.resample(target_offset,
+    idata = idata.resample(pd.to_timedelta(deltat),
                            closed='left',
                            label='left',
                            base=base).mean()

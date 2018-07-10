@@ -416,6 +416,17 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     history : pandas Series or DataFrame containing key 'ac_power'
         measurements to use for the forecast
 
+=======
+
+    fend : datetime
+        end time for the forecast
+
+    deltat : timedelta
+        interval for the forecast
+
+    history : pandas Series or DataFrame containing key 'ac_power'
+        measurements to use for the forecast
+
     Returns
     ---------
     idata : pandas DataFrame

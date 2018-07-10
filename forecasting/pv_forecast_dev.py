@@ -26,6 +26,9 @@ class PVobj():
             self.forecast_method = forecast_method
         else:
             # TODO: raise error
+            warnstring = 'DER ID ' + str(derid) + \
+               ' : no forecast method specified, default to persistence'
+            raise RuntimeWarning(warnstring)
             self.forecast_method = None
         self.dc_capacity = dc_capacity
         self.ac_capacity = ac_capacity
@@ -37,22 +40,29 @@ class PVobj():
         self.azimuth = azimuth
 
         # pre-compute clear sky power
+        # use datetime index for an actual year
         dr = pd.DatetimeIndex(start=datetime(base_year, 1, 1, 0, 0, 0, tzinfo=tz),
                               end=datetime(base_year, 12, 31, 23, 59, 0, tzinfo=tz),
                               freq='1T')
+
         self.clearsky = pd.DataFrame(index=dr, columns=['csGHI',
                                                         'csPOA',
                                                         'dc_power',
                                                         'ac_power'])
+        self.base_time = datetime(base_year, 1, 1, 0, 0, 0, tzinfo=tz)
+
         clearSky = clear_sky_model(self, dr)
         self.clearsky['csGHI'] = clearSky['ghi']
         self.clearsky['csPOA'] = clearSky['poa']
-        self.clearsky['dc_power'] = self.clearsky['csPOA']/1000*self.dc_capacity
+        self.clearsky['dc_power'] = self.clearsky['csPOA'] / 1000 * self.dc_capacity
         self.clearsky['ac_power'] = np.where(
                 self.clearsky['dc_power']>self.ac_capacity,
                 self.ac_capacity,
                 self.clearsky['dc_power']
                 )
+
+        # add time of year in seconds
+        self.clearsky['time_of_year'] = convert_to_time_of_year(dr)
 
     # PVobj member functions
 
@@ -205,7 +215,7 @@ def calc_clear_index(meas, ub):
 
 def calc_ratio(X, Y):
 
-    # Compute the ratio of X to Y
+    # Compute the ratio X / Y
     # inputs X and Y can be pandas.Series, or np.ndarray
     # returns the same type as the inputs
     np.seterr(divide='ignore')
@@ -214,8 +224,75 @@ def calc_ratio(X, Y):
     return ratio
 
 
-def forecast_persistence(pvobj, start, end, deltat, history, order=None,
-             dataWindowLength=timedelta(hours=1)):
+def _get_history_data_for_persistence(start, history, dataWindowLength):
+
+    """
+    Returns history data for persistence forecast
+
+    Parameters
+    -----------
+
+    pvobj : an instance of type PVobj
+
+    start : datetime
+        the time for the first forecast value
+
+    history : pandas DataFrame with key 'ac_power'
+        historical values of AC power from which the forecast is made.
+
+    dataWindowLenth : timedelta
+        time interval in history to be considered
+
+    Returns
+    ----------
+    fitdata :
+        data from history in period of duration dataWindowLength, prior to the
+        minimum of either the forecast start or the last time in history
+
+    """
+
+    # find last time to include. Earliest of either forecast start or the last
+    # time in history
+    end_data_time = min([max(history.index), start])
+    # select data within dataWindowLength
+    fitdata = history.loc[(history.index>=end_data_time - dataWindowLength) &
+                         (history.index<=end_data_time)]
+
+    return fitdata
+
+
+def convert_to_time_of_year(dr):
+    """
+    Returns a pandas Series of time of year (number of seconds)
+
+    Parameters
+    -----------
+
+    dr : pandas DatetimeIndex
+
+    Returns
+    --------
+
+    time_of_year : pandas Series
+        time of year in seconds
+
+    """
+    # get series of earliest time in each corresponding year
+    base_times = pd.DatetimeIndex([d.replace(month=1,
+                                             day=1,
+                                             hour=0,
+                                             minute=0,
+                                             second=0,
+                                             microsecond=0,
+                                             nanosecond=0) for d in dr])
+
+    time_of_year = (dr - base_times).total_seconds()
+
+    return time_of_year
+
+
+def forecast_persistence(pvobj, start, end, deltat, history,
+                         dataWindowLength=timedelta(hours=1)):
 
     """
     Generate forecast for pvobj from start to end at time resolution deltat
@@ -238,10 +315,6 @@ def forecast_persistence(pvobj, start, end, deltat, history, order=None,
     history : pandas Series
         historical values of AC power from which the forecast is made.
 
-    order : tuple of three integers
-        autoregressive, difference, and moving average orders for an ARMA
-        forecast model.
-
     dataWindowLenth : timedelta
         time interval in history to be considered
 
@@ -249,49 +322,69 @@ def forecast_persistence(pvobj, start, end, deltat, history, order=None,
     --------
 
     """
+    # get data for forecast
+    fitdata = _get_history_data_for_persistence(start,
+                                                history,
+                                                dataWindowLength)
 
-    fitdata, fitdata_index, fdr = _select_data_for_forecast(pvobj,
-                                                            start,
-                                                            end,
-                                                            deltat,
-                                                            history,
-                                                            dataWindowLength)
+    # convert data index from datetime to time of year (seconds)
+    toy = convert_to_time_of_year(fitdata.index)
 
-    # convert ac_power to ac_power_index
-    ac_power_index = fitdata
-    # forecast ac_power_index using persistence
+    # get clear-sky power at time of year
+    cspower = np.interp(toy,
+                        pvobj.clearsky['time_of_year'].values,
+                        pvobj.clearsky['ac_power'].values)
 
-    # convert forecast of ac_power_index to forecast of ac_power
+    # compute average clear sky power index
+    cspower_index = calc_ratio(fitdata, cspower).mean()
+
+    # time index for forecast
+    dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
+
+    # get clear sky power profile for forecast period
+    toy_dr = convert_to_time_of_year(dr)
+    fcst_cspower = np.interp(toy_dr,
+                             pvobj.clearsky['time_of_year'].values,
+                             pvobj.clearsky['ac_power'].values)
+
+    # forecast ac_power_index using persistence of clear sky power index
+    fcst_power = pd.Series(data=fcst_cspower * cspower_index,
+                           index=dr,
+                           name='ac_power')
+
+    return fcst_power
+
 
 def _extend_datetime_index(start, end, deltat, earlier):
     """
     Extends a datetime index from  ``start`` to ``end`` at
     interval ``deltat`` to begin prior to ``earlier`` time.
-    
+
     Parameters
     -------------
     start : datetime
         the start time for the datetime index
-        
+
     end : datetime
         the end time for the datetime index
-        
+
     deltat : timedelta
         the time interval for the datetime index
-    
+
     earlier : datetime
         earlier time to include in the extended datetime index
-        
+
     Returns
     ------------
     idr : DateTimeIndex
         start replaced by earlier time, time interval and end time maintained
-        
+
     """
+
     if earlier > start:
         raise Exception("Error in _extend_datetime_index: earlier > start")
         return
-    
+
     # number of intervals with length deltat between start of input
     # datetime index and the earlier time to be included
     num_intervals = int(
@@ -304,39 +397,39 @@ def _extend_datetime_index(start, end, deltat, earlier):
 
     return idr
 
-    
+
 def _align_data_to_forecast(fstart, fend, deltat, history):
     """
     Interpolate history to times that are in phase with forecast
-    
+
     Parameters
     -----------
     fstart : datetime
         first time for the forecast
-        
+
     fend : datetime
         end time for the forecast
-    
+
     deltat : timedelta
         interval for the forecast
-    
+
     history : pandas Series or DataFrame containing key 'ac_power'
         measurements to use for the forecast
-        
+
     Returns
     ---------
     idata : pandas DataFrame
         contains history interpolated to times that are in phase with requested
         forecast times
-        
+
     idr : pandas DatetimeIndex
         datetime index that includes history and forecast periods and is in
         phase with forecast times
-        
+
     """
-    
+
     idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
-    
+
     tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'])
 
     # merge history into empty dataframe that has the index we want
@@ -368,7 +461,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     return idata, idr
 
 
-def _get_data_for_forecast(pvobj, start, end, deltat, history,
+def _get_data_for_ARMA_forecast(pvobj, start, end, deltat, history,
                               dataWindowLength):
 
     """
@@ -424,13 +517,12 @@ def _get_data_for_forecast(pvobj, start, end, deltat, history,
     return fitdata, f_intervals
 
 
-
 def forecast_ARMA(pvobj, start, end, deltat, history, order=None,
                   dataWindowLength=timedelta(hours=1)):
 
     """
-    Generate forecast for pvobj from start to end at time resolution deltat
-    using an ARMA model of order fit to data in history.
+    Generate forecast from start to end at time resolution deltat
+    using an ARMA model of order fit to AC power data in history.
 
     Parameters
     -----------
@@ -459,7 +551,7 @@ def forecast_ARMA(pvobj, start, end, deltat, history, order=None,
 
     # TODO: input validation
 
-    fitdata, f_intervals = _get_data_for_forecast(pvobj, start, end,
+    fitdata, f_intervals = _get_data_for_ARMA_forecast(pvobj, start, end,
                                                        deltat, history,
                                                        dataWindowLength)
 
@@ -780,20 +872,26 @@ if __name__ == "__main__":
         plt.show()
 
         pvobj = pvdict['Prosperity']
-        hstart = datetime(2016, 1, 3, 0, 0, 0, tzinfo=USMtn)
-        hend = datetime(2016, 1, 6, 11, 50, 0, tzinfo=USMtn)
+        hstart = datetime(2016, 1, 3, 0, 0, 30, tzinfo=USMtn)
+        hend = datetime(2016, 1, 6, 11, 50, 30, tzinfo=USMtn)
         dat = pvobj.clearsky['ac_power']
         history = dat.loc[(dat.index>=hstart) & (dat.index<hend)]
         fstart = datetime(2016, 1, 6, 12, 3, 0, tzinfo=USMtn)
         fend = fstart + timedelta(minutes=60)
-        fcst = forecast_ARMA(pvobj,
+        fcstA = forecast_ARMA(pvobj,
                              start=fstart,
                              end=fend,
                              deltat=timedelta(minutes=15),
                              history=history,
                              order=(1, 1, 0),
                              dataWindowLength=timedelta(hours=2))
-        print(fcst)
+
+        fcstP = forecast_persistence(pvobj,
+                             start=fstart,
+                             end=fend,
+                             deltat=timedelta(minutes=15),
+                             history=history,
+                             dataWindowLength=timedelta(hours=2))
 
         # for plotting
         hst = history[history.index>=fstart - timedelta(hours=3)]
@@ -801,5 +899,6 @@ if __name__ == "__main__":
         plt.gca().xaxis.set(major_formatter=dateFormatter)
         plt.xticks(rotation=70)
         plt.plot(hst, 'b-')
-        plt.plot(fcst, 'r*')
+        plt.plot(fcstA, 'r+')
+        plt.plot(fcstP, 'rx')
         plt.show()

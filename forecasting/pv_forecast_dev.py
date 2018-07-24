@@ -22,8 +22,8 @@ class PVobj():
         self.derid = derid
         # TODO: using a surrogate in forecasting is NOT implemented
         self.surrogateid = surrogateid
-        if forecast_method in ['ARMA']:
-            self.forecast_method = forecast_method
+        if forecast_method.lower() in ['arma', 'persistence']:
+            self.forecast_method = forecast_method.lower()
         else:
             # TODO: raise error
             warnstring = 'DER ID ' + str(derid) + \
@@ -65,6 +65,33 @@ class PVobj():
         self.clearsky['time_of_year'] = convert_to_time_of_year(dr)
 
     # PVobj member functions
+    def forecast(self,
+                 start,
+                 end,
+                 history,
+                 deltat=timedelta(minutes=15),
+                 dataWindowLength=timedelta(hours=1),
+                 order=(1, 1, 0)):
+
+        # wrapper for functions forecast_ARMA and forecast_persistence
+
+        if self.forecast_method=='arma':
+            return forecast_ARMA(self,
+                                 start,
+                                 end,
+                                 history,
+                                 deltat,
+                                 dataWindowLength,
+                                 order)
+
+        elif self.forecast_method=='persistence':
+            return forecast_persistence(self,
+                                        start,
+                                        end,
+                                        history,
+                                        deltat,
+                                        dataWindowLength)
+
 
 # Forecast functions
 def solar_position(pvobj, dr):
@@ -291,7 +318,7 @@ def convert_to_time_of_year(dr):
     return time_of_year
 
 
-def forecast_persistence(pvobj, start, end, deltat, history,
+def forecast_persistence(pvobj, start, end, history, deltat,
                          dataWindowLength=timedelta(hours=1)):
 
     """
@@ -309,11 +336,11 @@ def forecast_persistence(pvobj, start, end, deltat, history,
     end : datetime
         the last time to be forecast
 
-    deltat : timedelta
-        the time interval for the forecast
-
     history : pandas Series
         historical values of AC power from which the forecast is made.
+
+    deltat : timedelta
+        the time interval for the forecast
 
     dataWindowLenth : timedelta
         time interval in history to be considered
@@ -528,8 +555,8 @@ def _get_data_for_ARMA_forecast(pvobj, start, end, deltat, history,
     return fitdata, f_intervals
 
 
-def forecast_ARMA(pvobj, start, end, deltat, history, order=None,
-                  dataWindowLength=timedelta(hours=1)):
+def forecast_ARMA(pvobj, start, end, history, deltat,
+                  dataWindowLength=timedelta(hours=1), order=None):
 
     """
     Generate forecast from start to end at time resolution deltat
@@ -874,7 +901,7 @@ if __name__ == "__main__":
                                      tz=USMtn,
                                      tilt=35,
                                      azimuth=240,
-                                     forecast_method='ARMA')
+                                     forecast_method='persistence')
 
         plt.plot(pvdict['Prosperity'].clearsky['ac_power'][:1440])
         plt.show()
@@ -882,26 +909,17 @@ if __name__ == "__main__":
         plt.plot(pvdict['Prosperityx2'].clearsky['ac_power'][:1440])
         plt.show()
 
-        pvobj = pvdict['Prosperity']
+        pvobj = pvdict['Prosperityx2']
         hstart = datetime(2016, 1, 3, 0, 0, 30, tzinfo=USMtn)
         hend = datetime(2016, 1, 6, 11, 50, 30, tzinfo=USMtn)
         dat = pvobj.clearsky['ac_power']
         history = dat.loc[(dat.index>=hstart) & (dat.index<hend)]
         fstart = datetime(2016, 1, 6, 12, 3, 0, tzinfo=USMtn)
         fend = fstart + timedelta(minutes=60)
-        fcstA = forecast_ARMA(pvobj,
-                             start=fstart,
+        fcstP = pvobj.forecast(start=fstart,
                              end=fend,
-                             deltat=timedelta(minutes=15),
                              history=history,
-                             order=(1, 1, 0),
-                             dataWindowLength=timedelta(hours=2))
-
-        fcstP = forecast_persistence(pvobj,
-                             start=fstart,
-                             end=fend,
                              deltat=timedelta(minutes=15),
-                             history=history,
                              dataWindowLength=timedelta(hours=2))
 
         # for plotting
@@ -910,6 +928,5 @@ if __name__ == "__main__":
         plt.gca().xaxis.set(major_formatter=dateFormatter)
         plt.xticks(rotation=70)
         plt.plot(hst, 'b-')
-        plt.plot(fcstA, 'r+')
         plt.plot(fcstP, 'rx')
         plt.show()

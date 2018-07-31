@@ -461,6 +461,12 @@ def _get_history_data_for_persistence(start, history, dataWindowLength):
     return fitdata
 
 
+def is_leap_year(year):
+    """Determine whether a year is a leap year."""
+
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+
+
 def convert_to_time_of_year(dr):
     """
     Returns a pandas Series of time of year (number of seconds)
@@ -488,7 +494,13 @@ def convert_to_time_of_year(dr):
                                  'second': 0})
     base_times = base_times.dt.tz_localize(dr.tz)
 
-    time_of_year = (dr - base_times).dt.total_seconds()
+    ly = time_of_year.dt.year.apply(is_leap_year)
+    sec_per_year = 365*24*60*60
+    sec_per_leap_year = 366*24*60*60
+    
+    denom = np.where(ly, sec_per_leap_year, sec_per_year)
+
+    time_of_year = (dr - base_times).dt.total_seconds() / denom
 
     return time_of_year
 
@@ -1087,13 +1099,13 @@ if __name__ == "__main__":
         pvobj = pvdict['Prosperityx2']
         
         # use clearsky model as a surrogate for system data
-        hstart = datetime(2016, 1, 3, 0, 0, 30, tzinfo=USMtn)
-        hend = datetime(2016, 1, 6, 11, 50, 30, tzinfo=USMtn)
+        hstart = datetime(2016, 2, 3, 0, 0, 30, tzinfo=USMtn)
+        hend = datetime(2016, 3, 6, 11, 50, 30, tzinfo=USMtn)
         dat = pvobj.clearsky['ac_power']
         history = dat.loc[(dat.index>=hstart) & (dat.index<hend)]
 
         # forecast period
-        fstart = datetime(2016, 1, 6, 12, 3, 0, tzinfo=USMtn)
+        fstart = datetime(2016, 2, 16, 17, 3, 0, tzinfo=USMtn)
         fend = fstart + timedelta(minutes=60)
         fcstP = pvobj.forecast(start=fstart,
                              end=fend,
@@ -1102,7 +1114,7 @@ if __name__ == "__main__":
                              dataWindowLength=timedelta(hours=2))
 
         # for plotting
-        hst = history[history.index>=fstart - timedelta(hours=3)]
+        hst = history[(history.index>=(fstart - timedelta(hours=3))) & (history.index<fstart)]
         dateFormatter = mdates.DateFormatter('%H:%M')
         plt.gca().xaxis.set(major_formatter=dateFormatter)
         plt.xticks(rotation=70)

@@ -37,6 +37,30 @@ class PVobj():
         self.tilt = tilt
         self.azimuth = azimuth
 
+        # pre-compute clear sky power
+        # use datetime index for an actual year
+        dr = pd.DatetimeIndex(start=datetime(base_year, 1, 1, 0, 0, 0, tzinfo=tz),
+                              end=datetime(base_year, 12, 31, 23, 59, 0, tzinfo=tz),
+                              freq='1T')
+
+        self.clearsky = pd.DataFrame(index=dr, columns=['csGHI',
+                                                        'csPOA',
+                                                        'dc_power',
+                                                        'ac_power'])
+        self.base_time = datetime(base_year, 1, 1, 0, 0, 0, tzinfo=tz)
+
+        clearSky = clear_sky_model(self, dr)
+        self.clearsky['csGHI'] = clearSky['ghi']
+        self.clearsky['csPOA'] = clearSky['poa']
+        self.clearsky['dc_power'] = self.clearsky['csPOA'] / 1000 * self.dc_capacity
+        self.clearsky['ac_power'] = np.where(
+                self.clearsky['dc_power']>self.ac_capacity,
+                self.ac_capacity,
+                self.clearsky['dc_power']
+                )
+
+        # add time of year in seconds
+        self.clearsky['time_of_year'] = convert_to_time_of_year(dr)
 
     # PVobj member functions
     def forecast(self,
@@ -481,28 +505,6 @@ def convert_to_time_of_year(dr):
     return time_of_year
 
 
-def get_clearsky_power(pvobj, dr, deltat=timedelta(minutes=1)):
-    # calculate clear sky power for pvobj on datetimes dr at interval deltat
-    
-    clearsky = pd.DataFrame(index=dr, columns=['csGHI',
-                                               'csPOA',
-                                               'dc_power',
-                                               'ac_power'])
-    clearSky = clear_sky_model(pvobj, dr)
-    clearsky['csGHI'] = clearSky['ghi']
-    clearsky['csPOA'] = clearSky['poa']
-    # convert POA to DC power
-    clearsky['dc_power'] = clearsky['csPOA'] / 1000 * pvobj.dc_capacity
-    # translate DC to AC power
-    clearsky['ac_power'] = np.where(clearsky['dc_power']>pvobj.ac_capacity,
-                                    pvobj.ac_capacity,
-                                    clearsky['dc_power']
-                                    )
-    pvobj.clearsky = clearsky
-
-    return clearsky['ac_power']
-
-
 def forecast_persistence(pvobj, start, end, history, deltat,
                          dataWindowLength=timedelta(hours=1)):
 
@@ -539,26 +541,29 @@ def forecast_persistence(pvobj, start, end, history, deltat,
                                                 history,
                                                 dataWindowLength)
 
-    # get clear-sky power from history start through forecast end
-    cspower = get_clearsky_power(pvobj,
-                                 fitdata.index)
+    # convert data index from datetime to time of year (seconds)
+    toy = convert_to_time_of_year(fitdata.index)
 
-    # align fitdata to cspower times
-    
+    # get clear-sky power at time of year
+    cspower = np.interp(toy,
+                        pvobj.clearsky['time_of_year'].values,
+                        pvobj.clearsky['ac_power'].values)
+
     # compute average clear sky power index
-    cspower_index = calc_ratio(fitdata, cspower)
+    cspower_index = calc_ratio(fitdata, cspower).mean()
 
     # time index for forecast
-    fdr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
+    dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
 
     # get clear sky power profile for forecast period
+    toy_dr = convert_to_time_of_year(dr)
+    fcst_cspower = np.interp(toy_dr,
+                             pvobj.clearsky['time_of_year'].values,
+                             pvobj.clearsky['ac_power'].values)
 
-    fcst_cspower = get_clearsky_power(pvobj,
-                                      fdr)
-    
     # forecast ac_power_index using persistence of clear sky power index
-    fcst_power = pd.Series(data=fcst_cspower * cspower_index.mean(),
-                           index=fdr,
+    fcst_power = pd.Series(data=fcst_cspower * cspower_index,
+                           index=dr,
                            name='ac_power')
 
     return fcst_power
@@ -1064,86 +1069,55 @@ if __name__ == "__main__":
     else:
         # make a dict of PV system objects
         pvdict = {};
-        pvdict['sunpower2016'] = PVobj('sunpower',
-                                        dc_capacity=1900,
-                                        ac_capacity=3000,
-                                        lat=35.05,
-                                        lon=-106.54,
-                                        alt=1657,
-                                        tz=USMtn,
-                                        tilt=35,
-                                        azimuth=180,
-                                        base_year=2016,
-                                        forecast_method='persistence')
+        pvdict['Prosperity'] = PVobj('Prosperity',
+                                     dc_capacity=500,
+                                     ac_capacity=480,
+                                     lat=35.04,
+                                     lon=-106.62,
+                                     alt=1619,
+                                     tz=USMtn,
+                                     tilt=25,
+                                     azimuth=180,
+                                     forecast_method='ARMA')
+        pvdict['Prosperityx2'] = PVobj('Prosperity',
+                                     dc_capacity=1000,
+                                     ac_capacity=960,
+                                     lat=35.04,
+                                     lon=-106.62,
+                                     alt=1619,
+                                     tz=USMtn,
+                                     tilt=35,
+                                     azimuth=240,
+                                     forecast_method='persistence')
 
+        plt.plot(pvdict['Prosperity'].clearsky['ac_power'][:1440])
+        plt.show()
 
-        pvdict['sunpower2018'] = PVobj('sunpower',
-                                        dc_capacity=1900,
-                                        ac_capacity=3000,
-                                        lat=35.05,
-                                        lon=-106.54,
-                                        alt=1657,
-                                        tz=USMtn,
-                                        tilt=35,
-                                        azimuth=180,
-                                        base_year=2018,
-                                        forecast_method='persistence')
+        plt.plot(pvdict['Prosperityx2'].clearsky['ac_power'][:1440])
+        plt.show()
 
-        from dateutil import parser
-        timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)
-                      for ts in ['2018-02-18T16:00:00', '2018-02-18T16:15:00', '2018-02-18T16:30:00', '2018-02-18T16:45:00']]
-        values = [300.0, 400.1, 500.2, 600.3]
-        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps))
-        start = parser.parse('2018-02-18T17:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
-        end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
-
-        fc_2016 = pvdict['sunpower2016'].forecast(start=start,
-                                        end=end,
-                                        history=history,
-                                        deltat=timedelta(minutes=15),
-                                        dataWindowLength=timedelta(hours=1))
-
-        print(fc_2016)
-
-        fc_2018 = pvdict['sunpower2018'].forecast(start=start,
-                                        end=end,
-                                        history=history,
-                                        deltat=timedelta(minutes=15),
-                                        dataWindowLength=timedelta(hours=1))
-        print(fc_2018)
+        pvobj = pvdict['Prosperityx2']
         
-# =============================================================================
-# 
-#         plt.plot(pvdict['Prosperity'].clearsky['ac_power'][:1440])
-#         plt.show()
-# 
-#         plt.plot(pvdict['Prosperityx2'].clearsky['ac_power'][:1440])
-#         plt.show()
-# 
-#         pvobj = pvdict['Prosperityx2']
-#         
-#         # use clearsky model as a surrogate for system data
-#         hstart = datetime(2016, 2, 3, 0, 0, 30, tzinfo=USMtn)
-#         hend = datetime(2016, 3, 6, 11, 50, 30, tzinfo=USMtn)
-#         dat = pvobj.clearsky['ac_power']
-#         history = dat.loc[(dat.index>=hstart) & (dat.index<hend)]
-# 
-#         # forecast period
-#         fstart = datetime(2016, 2, 16, 17, 3, 0, tzinfo=USMtn)
-#         fend = fstart + timedelta(minutes=60)
-#         fcstP = pvobj.forecast(start=fstart,
-#                              end=fend,
-#                              history=history,
-#                              deltat=timedelta(minutes=15),
-#                              dataWindowLength=timedelta(hours=2))
-# 
-#         # for plotting
-#         hst = history[(history.index>=(fstart - timedelta(hours=3))) & (history.index<fstart)]
-#         dateFormatter = mdates.DateFormatter('%H:%M')
-#         plt.gca().xaxis.set(major_formatter=dateFormatter)
-#         plt.xticks(rotation=70)
-#         plt.plot(hst, 'b-')
-#         plt.plot(fcstP, 'rx')
-#         plt.show()
-# 
-# =============================================================================
+        # use clearsky model as a surrogate for system data
+        hstart = datetime(2016, 2, 3, 0, 0, 30, tzinfo=USMtn)
+        hend = datetime(2016, 3, 6, 11, 50, 30, tzinfo=USMtn)
+        dat = pvobj.clearsky['ac_power']
+        history = dat.loc[(dat.index>=hstart) & (dat.index<hend)]
+
+        # forecast period
+        fstart = datetime(2016, 2, 16, 17, 3, 0, tzinfo=USMtn)
+        fend = fstart + timedelta(minutes=60)
+        fcstP = pvobj.forecast(start=fstart,
+                             end=fend,
+                             history=history,
+                             deltat=timedelta(minutes=15),
+                             dataWindowLength=timedelta(hours=2))
+
+        # for plotting
+        hst = history[(history.index>=(fstart - timedelta(hours=3))) & (history.index<fstart)]
+        dateFormatter = mdates.DateFormatter('%H:%M')
+        plt.gca().xaxis.set(major_formatter=dateFormatter)
+        plt.xticks(rotation=70)
+        plt.plot(hst, 'b-')
+        plt.plot(fcstP, 'rx')
+        plt.show()

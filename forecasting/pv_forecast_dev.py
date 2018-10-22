@@ -15,8 +15,8 @@ class PVobj():
     # create an instance of a PV class object
     def __init__(self, derid, lat, lon, alt, tz,
                  tilt, azimuth, dc_capacity, ac_capacity,
-                 forecast_method='ARMA', surrogateid=None,
-                 base_year=2016):
+                 forecast_method='persistence', surrogateid=None):
+
         self.derid = derid
         # TODO: using a surrogate in forecasting is NOT implemented
         self.surrogateid = surrogateid
@@ -76,184 +76,105 @@ def solar_position(pvobj, dr):
                                        pvobj.timezone,
                                        pvobj.alt)
 
-    sp = ephemeris(dr, Location.latitude, Location.longitude)
+    sp = pvlib.solarposition.ephemeris(dr, Location.latitude,
+                                       Location.longitude)
 
     return sp
 
+# block of code copied here pending pvlib v0.6.1
 
-def ephemeris(time, latitude, longitude, pressure=101325, temperature=12):
+NS_PER_HR = 1.e9 * 3600.  # nanoseconds per hour
+
+def _hour_angle_to_hours(times, hourangle, longitude, equation_of_time):
+    """converts hour angles in degrees to hours as a numpy array"""
+    naive_times = times.tz_localize(None)  # naive but still localized
+    tzs = 1 / NS_PER_HR * (
+        naive_times.astype(np.int64) - times.astype(np.int64))
+    hours = (hourangle - longitude - equation_of_time / 4.) / 15. + 12. + tzs
+    return np.asarray(hours)
+
+
+def _local_times_from_hours_since_midnight(times, hours):
     """
-    Python-native solar position calculator.  Included here from pvlib until
-    performance improvement is made in pvlib source.
+    converts hours since midnight from an array of floats to localized times
+    """
+    tz_info = times.tz  # pytz timezone info
+    naive_times = times.tz_localize(None)  # naive but still localized
+    # normalize local, naive times to previous midnight and add the hours until
+    # sunrise, sunset, and transit
+    return pd.DatetimeIndex(
+        (naive_times.normalize().astype(np.int64) +
+         (hours * NS_PER_HR).astype(np.int64)).astype('datetime64[ns]'),
+        tz=tz_info)
+
+
+def _times_to_hours_after_local_midnight(times):
+    """convert local pandas datetime indices to array of hours as floats"""
+    times = times.tz_localize(None)
+    hrs = 1 / NS_PER_HR * (
+        times.astype(np.int64) - times.normalize().astype(np.int64))
+    return np.array(hrs)
+
+def sun_rise_set_transit_geometric(times, latitude, longitude, declination,
+                                   equation_of_time):
+    """
+    Geometric calculation of solar sunrise, sunset, and transit.
+
+    .. warning:: The geometric calculation assumes a circular earth orbit with
+        the sun as a point source at its center, and neglects the effect of
+        atmospheric refraction on zenith. The error depends on location and
+        time of year but is of order 10 minutes.
 
     Parameters
     ----------
-    time : pandas.DatetimeIndex
+    times : pandas.DatetimeIndex
+        Corresponding timestamps, must be localized to the timezone for the
+        ``latitude`` and ``longitude``.
     latitude : float
+        Latitude in degrees, positive north of equator, negative to south
     longitude : float
-    pressure : float or Series, default 101325
-        Ambient pressure (Pascals)
-    temperature : float or Series, default 12
-        Ambient temperature (C)
+        Longitude in degrees, positive east of prime meridian, negative to west
+    declination : numeric
+        declination angle in radians at ``times``
+    equation_of_time : numeric
+        difference in time between solar time and mean solar time in minutes
 
     Returns
     -------
-
-    DataFrame with the following columns:
-
-        * apparent_elevation : apparent sun elevation accounting for
-          atmospheric refraction.
-        * elevation : actual elevation (not accounting for refraction)
-          of the sun in decimal degrees, 0 = on horizon.
-          The complement of the zenith angle.
-        * azimuth : Azimuth of the sun in decimal degrees East of North.
-          This is the complement of the apparent zenith angle.
-        * apparent_zenith : apparent sun zenith accounting for atmospheric
-          refraction.
-        * zenith : Solar zenith angle
-        * solar_time : Solar time in decimal hours (solar noon is 12.00).
+    sunrise : datetime
+        localized sunrise time
+    sunset : datetime
+        localized sunset time
+    transit : datetime
+        localized sun transit time
 
     References
-    -----------
+    ----------
+    [1] J. A. Duffie and W. A. Beckman,  "Solar Engineering of Thermal
+    Processes, 3rd Edition," J. Wiley and Sons, New York (2006)
 
-    Grover Hughes' class and related class materials on Engineering
-    Astronomy at Sandia National Laboratories, 1985.
-
-    See also
-    --------
-    pyephem, spa_c, spa_python
+    [2] Frank Vignola et al., "Solar And Infrared Radiation Measurements,"
+    CRC Press (2012)
 
     """
+    if not isinstance(times, pd.DatetimeIndex):
+        times = pd.DatetimeIndex([times])
 
-    # Added by Rob Andrews (@Calama-Consulting), Calama Consulting, 2014
-    # Edited by Will Holmgren (@wholmgren), University of Arizona, 2014
-
-    # Most comments in this function are from PVLIB_MATLAB or from
-    # pvlib-python's attempt to understand and fix problems with the
-    # algorithm. The comments are *not* based on the reference material.
-    # This helps a little bit:
-    # http://www.cv.nrao.edu/~rfisher/Ephemerides/times.html
-
-    # the inversion of longitude is due to the fact that this code was
-    # originally written for the convention that positive longitude were for
-    # locations west of the prime meridian. However, the correct convention (as
-    # of 2009) is to use negative longitudes for locations west of the prime
-    # meridian. Therefore, the user should input longitude values under the
-    # correct convention (e.g. Albuquerque is at -106 longitude), but it needs
-    # to be inverted for use in the code.
-
-    Latitude = latitude
-    Longitude = -1 * longitude
-
-    Abber = 20 / 3600.
-    LatR = np.radians(Latitude)
-
-    # the SPA algorithm needs time to be expressed in terms of
-    # decimal UTC hours of the day of the year.
-
-    # if localized, convert to UTC. otherwise, assume UTC.
-    try:
-        time_utc = time.tz_convert('UTC')
-    except TypeError:
-        time_utc = time
-
-    # strip out the day of the year and calculate the decimal hour
-    DayOfYear = time_utc.dayofyear
-    DecHours = (time_utc.hour + time_utc.minute/60. + time_utc.second/3600. +
-                time_utc.microsecond/3600.e6)
-
-    # np.array needed for pandas > 0.20
-    UnivDate = np.array(DayOfYear)
-    UnivHr = np.array(DecHours)
-
-    Yr = np.array(time_utc.year) - 1900
-    YrBegin = 365 * Yr + np.floor((Yr - 1) / 4.) - 0.5
-
-    Ezero = YrBegin + UnivDate
-    T = Ezero / 36525.
-
-    # Calculate Greenwich Mean Sidereal Time (GMST)
-    GMST0 = 6 / 24. + 38 / 1440. + (
-        45.836 + 8640184.542 * T + 0.0929 * T ** 2) / 86400.
-    GMST0 = 360 * (GMST0 - np.floor(GMST0))
-    GMSTi = np.mod(GMST0 + 360 * (1.0027379093 * UnivHr / 24.), 360)
-
-    # Local apparent sidereal time
-    LocAST = np.mod((360 + GMSTi - Longitude), 360)
-
-    EpochDate = Ezero + UnivHr / 24.
-    T1 = EpochDate / 36525.
-
-    ObliquityR = np.radians(
-        23.452294 - 0.0130125 * T1 - 1.64e-06 * T1 ** 2 + 5.03e-07 * T1 ** 3)
-    MlPerigee = 281.22083 + 4.70684e-05 * EpochDate + 0.000453 * T1 ** 2 + (
-        3e-06 * T1 ** 3)
-    MeanAnom = np.mod((358.47583 + 0.985600267 * EpochDate - 0.00015 *
-                       T1 ** 2 - 3e-06 * T1 ** 3), 360)
-    Eccen = 0.01675104 - 4.18e-05 * T1 - 1.26e-07 * T1 ** 2
-    EccenAnom = MeanAnom
-    E = 0
-
-    while np.max(abs(EccenAnom - E)) > 0.0001:
-        E = EccenAnom
-        EccenAnom = MeanAnom + np.degrees(Eccen)*np.sin(np.radians(E))
-
-    TrueAnom = (
-        2 * np.mod(np.degrees(np.arctan2(((1 + Eccen) / (1 - Eccen)) ** 0.5 *
-                   np.tan(np.radians(EccenAnom) / 2.), 1)), 360))
-    EcLon = np.mod(MlPerigee + TrueAnom, 360) - Abber
-    EcLonR = np.radians(EcLon)
-    DecR = np.arcsin(np.sin(ObliquityR)*np.sin(EcLonR))
-
-    RtAscen = np.degrees(np.arctan2(np.cos(ObliquityR)*np.sin(EcLonR),
-                                    np.cos(EcLonR)))
-
-    HrAngle = LocAST - RtAscen
-    HrAngleR = np.radians(HrAngle)
-    HrAngle = HrAngle - (360 * ((abs(HrAngle) > 180)))
-
-    SunAz = np.degrees(np.arctan2(-np.sin(HrAngleR),
-                                  np.cos(LatR)*np.tan(DecR) -
-                                  np.sin(LatR)*np.cos(HrAngleR)))
-    SunAz[SunAz < 0] += 360
-
-    SunEl = np.degrees(np.arcsin(
-        np.cos(LatR) * np.cos(DecR) * np.cos(HrAngleR) +
-        np.sin(LatR) * np.sin(DecR)))
-
-    SolarTime = (180 + HrAngle) / 15.
-
-    # Calculate refraction correction
-    Elevation = SunEl
-    TanEl = pd.Series(np.tan(np.radians(Elevation)), index=time_utc)
-    Refract = pd.Series(0, index=time_utc)
-
-    Refract[(Elevation > 5) & (Elevation <= 85)] = (
-        58.1/TanEl - 0.07/(TanEl**3) + 8.6e-05/(TanEl**5))
-
-    Refract[(Elevation > -0.575) & (Elevation <= 5)] = (
-        Elevation *
-        (-518.2 + Elevation*(103.4 + Elevation*(-12.79 + Elevation*0.711))) +
-        1735)
-
-    Refract[(Elevation > -1) & (Elevation <= -0.575)] = -20.774 / TanEl
-
-    Refract *= (283/(273. + temperature)) * (pressure/101325.) / 3600.
-
-    ApparentSunEl = SunEl + Refract
-
-    # make output DataFrame
-    DFOut = pd.DataFrame(index=time_utc)
-    DFOut['apparent_elevation'] = ApparentSunEl
-    DFOut['elevation'] = SunEl
-    DFOut['azimuth'] = SunAz
-    DFOut['apparent_zenith'] = 90 - ApparentSunEl
-    DFOut['zenith'] = 90 - SunEl
-    DFOut['solar_time'] = SolarTime
-
-    DFOut.index = time
-    
-    return DFOut
+    latitude_rad = np.radians(latitude)  # radians
+    sunset_angle_rad = np.arccos(-np.tan(declination) * np.tan(latitude_rad))
+    sunset_angle = np.degrees(sunset_angle_rad)  # degrees
+    # solar noon is at hour angle zero
+    # so sunrise is just negative of sunset
+    sunrise_angle = -sunset_angle
+    sunrise_hour = _hour_angle_to_hours(
+        times, sunrise_angle, longitude, equation_of_time)
+    sunset_hour = _hour_angle_to_hours(
+        times, sunset_angle, longitude, equation_of_time)
+    transit_hour = _hour_angle_to_hours(times, 0, longitude, equation_of_time)
+    sunrise = _local_times_from_hours_since_midnight(times, sunrise_hour)
+    sunset = _local_times_from_hours_since_midnight(times, sunset_hour)
+    transit = _local_times_from_hours_since_midnight(times, transit_hour)
+    return sunrise, sunset, transit
 
 
 def dniDiscIrrad(weather):
@@ -273,7 +194,7 @@ def dniDiscIrrad(weather):
         direct normal irradiance
     """
     disc = pvlib.irradiance.disc(ghi=weather['ghi'],
-                                 zenith=weather['zenith'],
+                                 solar_zenith=weather['zenith'],
                                  datetime_or_doy=weather.index)
     # NA's show up when the DNI component is zero (or less than zero), fill with 0.
     disc.fillna(0, inplace=True)
@@ -330,7 +251,7 @@ def clear_sky_model(pvobj, dr):
     clearSky['zenith'] = sp['zenith']
     clearSky['elevation'] = sp['elevation']
 
-    clearSky['extraI'] = pvlib.irradiance.extraradiation(dr)
+    clearSky['extraI'] = pvlib.irradiance.get_extra_radiation(dr)
 
     # calculate GHI using Haurwitz model
     clearSky['ghi'] = pvlib.clearsky.haurwitz(sp['apparent_zenith'])
@@ -364,7 +285,7 @@ def clear_sky_model(pvobj, dr):
                                                         sp['azimuth'])
 
     # Calculate the diffuse radiation from the ground in the plane of array
-    clearSky['diffuseGround'] = pvlib.irradiance.grounddiffuse(pvobj.tilt,
+    clearSky['diffuseGround'] = pvlib.irradiance.get_ground_diffuse(pvobj.tilt,
                                                               clearSky['ghi'])
 
     # Sum the two diffuse to get total diffuse
@@ -400,10 +321,10 @@ def calc_ratio(X, Y):
     return ratio
 
 
-def _get_history_data_for_persistence(start, history, dataWindowLength):
+def _get_data_for_persistence(start, history, dataWindowLength):
 
     """
-    Returns history data for persistence forecast
+    Returns data from history for persistence forecast
 
     Parameters
     -----------
@@ -443,59 +364,17 @@ def is_leap_year(year):
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def convert_to_time_of_year(dr):
-    """
-    Returns a pandas Series of time of year (number of seconds)
-
-    Parameters
-    -----------
-
-    dr : pandas DatetimeIndex
-
-    Returns
-    --------
-
-    time_of_year : pandas Series
-        time of year in seconds
-
-    """
-    
-    # create series of earliest time in each corresponding year
-    time_of_year = pd.Series(index=dr, data=dr)
-    base_times = pd.to_datetime({'year': time_of_year.dt.year,
-                                 'month': 1, 
-                                 'day': 1,
-                                 'hour': 0,
-                                 'minute': 0,
-                                 'second': 0})
-    base_times = base_times.dt.tz_localize(dr.tz)
-
-    ly = time_of_year.dt.year.apply(is_leap_year)
-    sec_per_year = 365*24*60*60
-    sec_per_leap_year = 366*24*60*60
-    
-    denom = np.where(ly, sec_per_leap_year, sec_per_year)
-
-    time_of_year = (dr - base_times).dt.total_seconds() / denom
-
-    return time_of_year
-
-
 def get_clearsky_power(pvobj, dr):
     # calculates clearsky AC power for pvobj at times in dr    
 
-    # setup dataframe for output
-    clearsky = pd.DataFrame(index=dr, columns=['csGHI',
-                                               'csPOA',
-                                               'dc_power',
-                                               'ac_power'])
 
-    clearSky = clear_sky_model(pvobj, dr)
-    clearsky['csGHI'] = clearSky['ghi']
-    clearsky['csPOA'] = clearSky['poa']
+    clearsky = clear_sky_model(pvobj, dr)
+    clearsky = clearsky[['ghi', 'poa']]
+
     # model DC power from POA irradiance
-    clearsky['dc_power'] = clearsky['csPOA'] / 1000 * pvobj.dc_capacity
-    # model AC power from DC power
+    clearsky['dc_power'] = clearsky['poa'] / 1000 * pvobj.dc_capacity
+
+    # model AC power from DC power, with clipping
     clearsky['ac_power'] = np.where(clearsky['dc_power']>pvobj.ac_capacity,
                                     pvobj.ac_capacity,
                                     clearsky['dc_power']
@@ -535,34 +414,56 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     --------
 
     """
-    # get data for forecast
-    fitdata = _get_history_data_for_persistence(start,
-                                                history,
-                                                dataWindowLength)
-
-    # get clear-sky power at time of year
-    cspower = get_clearsky_power(pvobj, fitdata.index)
-    
-    # compute average clear sky power index
-    cspower_index = calc_ratio(fitdata, cspower['ac_power'])
-
     # time index for forecast
     dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
 
-    fcst_cspower = get_clearsky_power(pvobj, dr)
+    # for sunrise and sunset calculation, time must be in timezone for location
+    local_end = end.astimezone(pvobj.timezone)
+    doy = pd.Timestamp(local_end).dayofyear
+    declination = pvlib.solarposition.declination_spencer71(doy)
+    eot = pvlib.solarposition.equation_of_time_spencer71(doy)
+    sr, ss, tr = sun_rise_set_transit_geometric(local_end,
+                                                                  pvobj.lat,
+                                                                  pvobj.lon,
+                                                                  declination,
+                                                                  eot)
 
-    # forecast ac_power_index using persistence of clear sky power index
-    fcst_power = pd.Series(data=fcst_cspower['ac_power'] * cspower_index.mean(),
-                           index=dr,
-                           name='ac_power')
+    # length of time for after-sunrise forecast
+    delta_fc = dataWindowLength + timedelta(minutes=30)
+
+    if end<sr:
+        # forecast period is before sunrise
+        fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
+    elif start < sr + delta_fc:
+        # forecast period is too near sunrise for history to have valid data
+        # get yesterday's data +/- deltat on either side of forecast window
+        # so we can interpolate to forecast points
+        fcst_power = _align_data_to_forecast(start - timedelta(days=1),
+                                             end - timedelta(days=1),
+                                             deltat, history)
+    else:
+        # get data for forecast
+        fitdata = _get_data_for_persistence(start, history, dataWindowLength)
+    
+        # get clear-sky power at time of year
+        cspower = get_clearsky_power(pvobj, fitdata.index)
+        
+        # compute average clear sky power index
+        cspower_index = calc_ratio(fitdata, cspower['ac_power'])
+    
+        fcst_cspower = get_clearsky_power(pvobj, dr)
+    
+        # forecast ac_power_index using persistence of clear sky power index
+        fcst_power = pd.Series(data=fcst_cspower['ac_power'] * cspower_index.mean(),
+                               index=dr,
+                               name='ac_power')
 
     return fcst_power
 
 
 def _extend_datetime_index(start, end, deltat, earlier):
     """
-    Extends a datetime index from  ``start`` to ``end`` at
-    interval ``deltat`` to begin prior to ``earlier`` time.
+    Extends a datetime index to begin prior to ``earlier`` time.
 
     Parameters
     -------------
@@ -620,17 +521,6 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     history : pandas Series or DataFrame containing key 'ac_power'
         measurements to use for the forecast
 
-=======
-
-    fend : datetime
-        end time for the forecast
-
-    deltat : timedelta
-        interval for the forecast
-
-    history : pandas Series or DataFrame containing key 'ac_power'
-        measurements to use for the forecast
-
     Returns
     ---------
     idata : pandas DataFrame
@@ -676,8 +566,8 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     return idata, idr
 
 
-def _get_data_for_ARMA_forecast(pvobj, start, end, deltat, history,
-                              dataWindowLength):
+def _get_data_for_ARMA_forecast(start, end, deltat, history,
+                                dataWindowLength):
 
     """
     Returns interpolated history data in phase with forecast start time and
@@ -685,8 +575,6 @@ def _get_data_for_ARMA_forecast(pvobj, start, end, deltat, history,
 
     Parameters
     -----------
-
-    pvobj : an instance of type PVobj
 
     start : datetime
         the time for the first forecast value
@@ -799,256 +687,6 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
 
     return f[fdr]
 
-#    def ARMA_one_step_forecast(self, y, column='Actual', p=1, q=0):
-#        """
-#        Make a one-step forecast from data in dataframe y. The data in y is differenced once. The default
-#        ARMA parameters are p=1, q=0.
-#        :param y: pandas dataframe
-#        :param column: A valid column name in the dataframe y to forecast
-#        :return: f a one-step ahead forecast for y
-#        """
-#        ARMA = sm.tsa.ARMA(y[column], (p, 1, q)).fit()
-#        f = ARMA.forecast(1)
-#
-#        return f
-#
-#    def ARMA_seasonal_forecast(self, et, y, windowLength=timedelta(days=7), seasonalPeriod=96,
-#                               tf='%Y_%m_%d_%H%M', saveModel=True):
-#        """
-#
-#        :param et: datetime end time for end of the forecast period.
-#        :param y:  dataframe object containing at least the same length of data as the window length.
-#        :param windowLength: The number of days to include in building the forecast
-#        :param seasonalPeriod: The number of lags before the identified season begins.
-#        :param tf: time format string for loading/saving model files.
-#        :param saveModel: bool flag for saving model seasonal ARMA model results.
-#        :return: pandas dataframe containig forecast for the next i points after et in y.
-#        """
-#        while True:
-#            try:
-#                st = et - windowLength
-#                d = y.loc[st:et]
-#                d.to_csv('C:\\python\\forecasting\\d_temp.csv')
-#                rel = 'ARMA_model_files\\'
-#                fname = rel + st.strftime(tf) + '_to_' + et.strftime(tf) + '.pickle'
-#                model = sm.tsa.statespace.SARMAX(d['Actual'], trend='n', order=(0, 1, 0),
-#                                                  seasonal_order=(1, 1, 1, seasonalPeriod))
-#                if os.path.isfile(fname):
-#                    results = sm.load(fname)
-#                else:
-#                    results = model.fit()
-#
-#                if saveModel:
-#                    results.save(fname)
-#
-#                f = results.forecast(seasonalPeriod)
-#                break  # will break while true when stable forecast has been made.
-#            except Exception as e:
-#                print(e)
-#                print('SHORT FORECAST: Calculating new parameters...')
-#                windowLength = windowLength - timedelta(days=1)
-#        return f
-#
-#    def ARMA(self, y, st, et, uptodate):
-#        """
-#
-#        :param y: pandas dataframe. Historical data to use for forecasting.
-#        :param starttime: datetime. The time to begin forecasting at.
-#        :param endtime:  datetime. Time to end forecasting and return
-#        :param uptodate: bool. Indicating the historical file is up to date with current time.
-#        :return: pandas dataframe. Data frame with updated forecast and actual
-#        """
-#
-#        # constants
-#        utc = pytz.utc
-#        mountain = pytz.timezone('US/Mountain')
-#        # tag = 'Meter_PV REC KW'  # tag for the pi data
-#        # col = ['datetime_utc', 'Actual']  # column names for dataframe
-#        forecast = 'ACPowerForecast'
-#
-#        # update forecast
-#        ptr = st
-#        while ptr != et + timedelta(minutes=15):
-#            w = y.loc[ptr - timedelta(hours=1, minutes=45):ptr]
-#            try:
-#                f = self.ARMA_one_step_forecast(w)
-#                if f[0] < 0:
-#                    y.loc[ptr + timedelta(minutes=15), forecast] = 0
-#                else:
-#                    y.loc[ptr + timedelta(minutes=15), forecast] = f[0]
-#            except Exception as e:
-#                y.loc[ptr + timedelta(minutes=15), forecast] = 0
-##                print(ptr)
-##                print(e)
-#                pass
-#
-#            # step forward
-#            ptr = ptr + timedelta(minutes=15)
-#
-#        # Add the latest forecast datetime column
-#        y.loc[ptr, 'datetime_utc'] = ptr.strftime('%m/%d/%Y %H:%M:%S')
-#
-#        # fill the forecast column with the rest of the previous day-ahead seasonal arma forecast.
-#        if not uptodate:
-#            curTime = self.checkTime()
-#            localTime = curTime.astimezone(mountain)
-#
-#            yesterdayMidnight = datetime(year=localTime.year, month=localTime.month, day=localTime.day,
-#                                         hour=0, minute=0, second=0, microsecond=0, tzinfo=mountain)
-#
-#            f = self.ARMA_seasonal_forecast(yesterdayMidnight, y, seasonalPeriod=96)
-#            f = f.to_frame('ACPowerForecast')
-#            f.loc[f['ACPowerForecast'] < 5] = 0
-#            f['datetime_utc'] = f.index.strftime('%m/%d/%Y %H:%M:%S')
-#            y = y.combine_first(f.loc[max(y.index) + timedelta(minutes=15):])
-#
-#        return y
-#
-#    def ClearSkyUpperBoundForecast(self, dr, m, SiteInformation, ModuleParameters, Inverter, NumInv):
-#        """
-#        Creates clear sky upper bound forecast from measured and clear sky data.
-#
-#        :param m: dataframe of measured weather station temperature and wind speed
-#        :param SiteInformation: dictionary['latitude', 'longitude', 'tz', 'altitude']
-#        :param ModuleParameters: pvlib pv system
-#        :param Inverter: pvlib inverter from inverter database
-#        :param NumInv: number of inverters
-#        :return: dataframe 'ACPowerForecast' column
-#        """
-#
-#        # calculate solar position (sp) and clearsky irradiance (cs) for date range dr
-#        cs, sp = self.ClearSkyModel(dr, SiteInformation)
-#
-#        # transfer values of temperature and windspeed from input m to dataframe cs
-#        Ta = np.array(m['Temperature'].values)
-#        WS = np.array(m['WindSpeed'].values)
-#        while len(Ta)<len(dr):
-#            Ta = np.concatenate((Ta, m['Temperature'].values))
-#            WS = np.concatenate((WS, m['WindSpeed'].values))
-#        Ta = Ta[0:len(dr)]
-#        WS = WS[0:len(dr)]
-#        cs['Temperature'] = Ta
-#        cs['WindSpeed'] = WS
-#
-#        cs = cs.combine_first(sp)
-#        f = IrradtoPower(cs, SiteInformation, ModuleParameters, Inverter, NumInv)
-#        f['CSACPowerForecast'] = f['ACPowerForecast']
-#
-#        tf = [x.strftime('%m/%d/%Y %H:%M:%S') for x in f.index]
-#        f['datetime_utc'] = tf
-#
-#        ## Adjust ac power forecast for clear index
-#        # This will enforce the clear index to one when dividing measured/forecast to be 1
-#        # cs.loc[sp['zenith'] > 85, 'ACPowerForecast'] = m.loc[sp['zenith'] > 85, 'Actual']
-#
-#        # Adjust the clear sky ac power forecast for prediction
-#        # write in 0 for dark hours
-#        f.loc[sp['zenith'] >= 90, 'CSACPowerForecast'] = 0
-#        # replace time interval near sunrise and sunset with linear interpolation
-#        f.loc[(sp['zenith'] > 85) & (sp['zenith'] < 90), 'CSACPowerForecast'] = float('nan')
-#        # Ensure the beginning of the interval is not nan to allow interpolation
-#        if pd.isnull(f.loc[min(dr), 'CSACPowerForecast']):
-#            f.loc[min(dr), 'CSACPowerForecast'] = 0
-#        f = f.interpolate(method='time')
-#        # remove negative values that occur at very low irradiance levels
-#        f.loc[f['CSACPowerForecast'] < 0, 'CSACPowerForecast'] = 0
-#        f = f[['datetime_utc', 'CSACPowerForecast']]
-#        # return f[['ACPowerForecast', 'CSACPowerForecast']]
-#        return f
-#
-#
-#    def calc_clearsky_index(self, meas, ub):
-#
-#        # Compute the clear index as a ratio of meas to ub
-#        # returns a np.array
-#
-#        try:
-#            clearIndex = np.true_divide(meas['Actual'].values, ub['CSACPowerForecast'].values)
-#        except RuntimeWarning:
-#            print('SHORT FORECAST: RuntimeWarning - likely dividing by zero.')
-#            clearIndex = 0
-#        clearIndex[clearIndex == np.inf] = 1.0
-#        clearIndex[np.isnan(clearIndex)] = 1.0
-#        clearIndex[clearIndex > 1.0] = 1.0
-#
-#        ci = pd.DataFrame(index=meas.index, columns=['clearIndex'])
-#        ci['clearIndex'] = clearIndex
-#
-#        return np.array(ci['clearIndex'].values)
-#
-#    def compile_kt(self, dr, ci, sr_ss_window=timedelta(hours=1.5)):
-#
-#        # returns a dataframe containing kt values using dr as the index.
-#        # dr is a pandas Datetimeindex
-#        # ci is a list of values to repeat to form kt
-#        # sr_ss_window is a timedelta. For this period after sunrise, or before
-#        # sunset, kt values are overwritten by 1
-#
-#        if not dr.freq:
-#            if len(dr)>3:
-#                tmpfreq = pd.infer_freq(dr)
-#            elif len(dr)==2:
-#                tmpfreq = dr[1] - dr[0]
-#            else:
-#                tmpfreq = timedelta(minutes=15) # default time step
-#        else:
-#            tmpfreq = dr.freq
-#
-#        kt = np.array([])
-#        # make sure kt is same length as period to be forecast
-#        while len(kt) < len(dr):
-#            kt = np.concatenate((kt, ci))
-#        kt = kt[0:len(dr)]
-#
-#        df = pd.DataFrame(index=dr)
-#        df['kt'] = kt
-#
-#        # overwrite sunrise/sunset hours with clear sky model
-#        # extend dr each end in case first/last values are within a sunrise/sunset window
-#        tdr = dr.union(pd.DatetimeIndex(start=min(dr - sr_ss_window), end=min(dr), freq = tmpfreq))
-#        tdr = tdr.union(pd.DatetimeIndex(start=max(tdr), end=max(dr + sr_ss_window), freq = tmpfreq))
-#
-#        # find sunrise/sunset hours
-#        sp = pvlib.solarposition.ephemeris(tdr, self.siteInfo['latitude'], self.siteInfo['longitude'])
-#        dl = sp['zenith'].values<90
-#        sr = dl[1:] & (dl[:-1] != dl[1:])
-#        sr = np.append(False, sr)
-#        ss = dl[:-1] & (dl[:-1] != dl[1:])
-#        ss = np.append(ss, False)
-#        sridx = sp.index[sr]
-#        ssidx = sp.index[ss]
-#        df = df.combine_first(pd.DataFrame(index=tdr))
-#        for i in sridx:
-#            u = (tdr > i) & (tdr < i + sr_ss_window)
-#            df.loc[tdr[u], 'kt'] = 1
-#        for i in ssidx:
-#            u = (tdr < i) & (tdr > i - sr_ss_window)
-#            df.loc[tdr[u], 'kt'] = 1
-#
-#        return df
-#
-#    def PersistenceForecast(self, y, kt, dr, f_upperbound):
-#        # generates a forecast for times in dr using clearsky index in kt and f_upperbound.
-#        # Data in kt are tiled to fill the length
-#        # of the requested forecast dr.  Clearness index is multiplied by f_upperbound
-#        # to produce the forecast, so it is implicit that f_upperbound covers the period
-#        # specified by dr.
-#        # returns dataframe 'y' which accumulates the history of forecast and actual values
-#
-#
-#        f_upper = f_upperbound.loc[dr, ['datetime_utc', 'CSACPowerForecast']]
-#
-#        # add kt column to f_upper
-#        tmp = self.compile_kt(dr, kt)
-#
-#        # Now multiply
-#        f_upper['ACPowerForecast'] = f_upper['CSACPowerForecast'] * tmp['kt']
-#        # extend y with new index values
-#        y = y.combine_first(pd.DataFrame(index=dr))
-#        # overwrite forecast values for date range dr
-#        y.loc[dr, ['ACPowerForecast', 'datetime_utc']] = f_upper.loc[dr, ['ACPowerForecast', 'datetime_utc']]
-#
-#        return y
 
 if __name__ == "__main__":
 
@@ -1059,7 +697,7 @@ if __name__ == "__main__":
     else:
         # make a dict of PV system objects
         pvdict = {};
-        pvdict['sunpower2016'] = PVobj('sunpower',
+        pvdict['sunpower'] = PVobj('sunpower',
                                         dc_capacity=1900,
                                         ac_capacity=3000,
                                         lat=35.05,
@@ -1068,42 +706,23 @@ if __name__ == "__main__":
                                         tz=USMtn,
                                         tilt=35,
                                         azimuth=180,
-                                        base_year=2016,
-                                        forecast_method='persistence')
-
-
-        pvdict['sunpower2018'] = PVobj('sunpower',
-                                        dc_capacity=1900,
-                                        ac_capacity=3000,
-                                        lat=35.05,
-                                        lon=-106.54,
-                                        alt=1657,
-                                        tz=USMtn,
-                                        tilt=35,
-                                        azimuth=180,
-                                        base_year=2018,
                                         forecast_method='persistence')
 
         from dateutil import parser
         timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)
-                      for ts in ['2018-02-18T16:00:00', '2018-02-18T16:15:00', '2018-02-18T16:30:00', '2018-02-18T16:45:00']]
+                      for ts in ['2018-02-18T16:00:00',
+                                 '2018-02-18T16:15:00',
+                                 '2018-02-18T16:30:00',
+                                 '2018-02-18T16:45:00']]
         values = [300.0, 400.1, 500.2, 600.3]
         history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps))
         start = parser.parse('2018-02-18T17:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 
-        fc_2016 = pvdict['sunpower2016'].forecast(start=start,
+        fc = pvdict['sunpower'].forecast(start=start,
                                         end=end,
                                         history=history,
                                         deltat=timedelta(minutes=15),
                                         dataWindowLength=timedelta(hours=1))
-
-        print(fc_2016)
-
-        fc_2018 = pvdict['sunpower2018'].forecast(start=start,
-                                        end=end,
-                                        history=history,
-                                        deltat=timedelta(minutes=15),
-                                        dataWindowLength=timedelta(hours=1))
-        print(fc_2018)
+        print(fc)
 

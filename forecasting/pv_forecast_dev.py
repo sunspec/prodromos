@@ -434,13 +434,16 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     if end<sr:
         # forecast period is before sunrise
         fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
-    elif start < sr + delta_fc:
+    elif ((start < sr + delta_fc) and
+          (len((history.index >= start - timedelta(days=1)) &
+              (history.index - timedelta(days=1) <= end))>2)):
         # forecast period is too near sunrise for history to have valid data
         # get yesterday's data +/- deltat on either side of forecast window
         # so we can interpolate to forecast points
-        fcst_power = _align_data_to_forecast(start - timedelta(days=1),
+        idata, idr = _align_data_to_forecast(start - timedelta(days=1),
                                              end - timedelta(days=1),
                                              deltat, history)
+        fcst_power = idata.loc[dr]
     else:
         # get data for forecast
         fitdata = _get_data_for_persistence(start, history, dataWindowLength)
@@ -691,9 +694,9 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
 if __name__ == "__main__":
 
     USMtn = pytz.timezone('US/Mountain')
-    if pvlib.__version__ < '0.4.1':
+    if pvlib.__version__ < '0.5.1':
         print('pvlib out-of-date, found version ' + pvlib.__version__ +
-              ', please upgrade to 0.4.1 or later')
+              ', please upgrade to 0.5.1 or later')
     else:
         # make a dict of PV system objects
         pvdict = {};
@@ -726,3 +729,21 @@ if __name__ == "__main__":
                                         dataWindowLength=timedelta(hours=1))
         print(fc)
 
+        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
+                              end='2018-02-20 00:00:00',
+                              freq='15T').tz_localize('MST')
+        cspower = get_clearsky_power(pvdict['sunpower'], dt)
+        history = cspower['ac_power']
+
+        fc_res = []
+        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
+        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
+            end = start + timedelta(hours=1)
+            fc_res.append(pvdict['sunpower'].forecast(start, end,
+                          history, timedelta(minutes=15),
+                          timedelta(hours=1)))
+            start += timedelta(minutes=30)
+
+        for fc in fc_res:
+            plt.plot(fc, 'x')
+        plt.show()

@@ -443,7 +443,8 @@ def forecast_persistence(pvobj, start, end, history, deltat,
         idata, idr = _align_data_to_forecast(start - timedelta(days=1),
                                              end - timedelta(days=1),
                                              deltat, history)
-        fcst_power = idata.loc[dr]
+        fcst_power = idata.loc[dr - timedelta(days=1), 'ac_power']
+        fcst_power.index = dr
     else:
         # get data for forecast
         fitdata = _get_data_for_persistence(start, history, dataWindowLength)
@@ -535,19 +536,22 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
         phase with forecast times
 
     """
-
+    history = history.to_frame()
     idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
 
     tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'])
 
     # merge history into empty dataframe that has the index we want
     # use outer join to retain time points in history
-    newdata = tmpdata.merge(history.to_frame(),
+    newdata = tmpdata.merge(history,
                             how='outer',
                             on=['ac_power'],
                             left_index=True,
                             right_index=True).tz_convert(tmpdata.index.tz)
 
+    # if history has exact timesteps as idr, the merge above preseves the nan 
+    # in tmpdata, so newdata will still have nan where it should have data
+    newdata.loc[idr] = history.loc[idr]
     # fill in values on idr timesteps by interpolation
     newdata.interpolate(inplace=True)
 
@@ -747,3 +751,21 @@ if __name__ == "__main__":
         for fc in fc_res:
             plt.plot(fc, 'x')
         plt.show()
+
+        # change history
+        history = cspower['ac_power']
+        history.iloc[5:10] *= 5.0;
+        fc_res = []
+        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
+        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
+            end = start + timedelta(hours=1)
+            fc_res.append(pvdict['sunpower'].forecast(start, end,
+                          history, timedelta(minutes=15),
+                          timedelta(hours=1)))
+            start += timedelta(minutes=30)
+
+        plt.plot(history, '-')
+        for fc in fc_res:
+            plt.plot(fc, 'x')
+        plt.show()
+

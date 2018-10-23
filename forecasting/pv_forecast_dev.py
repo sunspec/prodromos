@@ -444,7 +444,7 @@ def forecast_persistence(pvobj, start, end, history, deltat,
                                              end - timedelta(days=1),
                                              deltat, history)
         fcst_power = idata.loc[dr - timedelta(days=1), 'ac_power']
-        fcst_power = fcst_power.reindex(dr)
+        fcst_power.index = dr
     else:
         # get data for forecast
         fitdata = _get_data_for_persistence(start, history, dataWindowLength)
@@ -764,6 +764,7 @@ if __name__ == "__main__":
                           timedelta(hours=1)))
             start += timedelta(minutes=30)
 
+        plt.plot(history, '-')
         for fc in fc_res:
             plt.plot(fc, 'x')
         plt.show()

@@ -45,7 +45,6 @@ class PVobj():
                  history,
                  deltat=timedelta(minutes=15),
                  dataWindowLength=timedelta(hours=1),
-                 sunrise=None,
                  order=(1, 1, 0)):
 
         # wrapper for functions forecast_ARMA and forecast_persistence
@@ -65,11 +64,8 @@ class PVobj():
                                         end,
                                         history,
                                         deltat,
-                                        dataWindowLength,
-                                        sunrise)
-        else:
-            raise ValueError('Invalid forecast method {}'
-                             .format(self.forecast_method))
+                                        dataWindowLength)
+
 
 # Forecast functions
 def solar_position(pvobj, dr):
@@ -388,8 +384,7 @@ def get_clearsky_power(pvobj, dr):
 
 
 def forecast_persistence(pvobj, start, end, history, deltat,
-                         dataWindowLength=timedelta(hours=1),
-                         sunrise=None):
+                         dataWindowLength=timedelta(hours=1)):
 
     """
     Generate forecast for pvobj from start to end at time resolution deltat
@@ -415,15 +410,10 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     dataWindowLenth : timedelta
         time interval in history to be considered
 
-    sunrise : str, default None
-        method for forecasting time after sunrise, values are 'yesterday', None
-
     Returns
     --------
-    ac_power : pandas Series
-        forecast from start to end at interval deltat
-    """
 
+    """
     # time index for forecast
     dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
 
@@ -432,25 +422,19 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     doy = pd.Timestamp(local_end).dayofyear
     declination = pvlib.solarposition.declination_spencer71(doy)
     eot = pvlib.solarposition.equation_of_time_spencer71(doy)
-
-    doy_yest = pd.Timestamp(local_end - timedelta(days=1)).dayofyear
-    declination_yest = pvlib.solarposition.declination_spencer71(doy_yest)
-    eot_yest = pvlib.solarposition.equation_of_time_spencer71(doy_yest)
-
-    sr, ss, tr = sun_rise_set_transit_geometric(local_end, pvobj.lat,
-                                                pvobj.lon, declination, eot)
-    sr_yest, ss_yest, _ = sun_rise_set_transit_geometric(
-        local_end - timedelta(days=1), pvobj.lat, pvobj.lon, declination_yest,
-        eot_yest)
+    sr, ss, tr = sun_rise_set_transit_geometric(local_end,
+                                                                  pvobj.lat,
+                                                                  pvobj.lon,
+                                                                  declination,
+                                                                  eot)
 
     # length of time for after-sunrise forecast
     delta_fc = dataWindowLength + timedelta(minutes=30)
 
-    if ((end<sr) and (start>ss_yest)):
-        # forecast period is nighttime
+    if end<sr:
+        # forecast period is before sunrise
         fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
-    elif ((sunrise == 'yesterday') and
-          (start < sr + delta_fc) and
+    elif ((start < sr + delta_fc) and
           (len((history.index >= start - timedelta(days=1)) &
               (history.index - timedelta(days=1) <= end))>2)):
         # forecast period is too near sunrise for history to have valid data
@@ -743,18 +727,10 @@ if __name__ == "__main__":
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 
         fc = pvdict['sunpower'].forecast(start=start,
-                                         end=end,
-                                         history=history,
-                                         deltat=timedelta(minutes=15),
-                                         dataWindowLength=timedelta(hours=1))
-        print(fc)
-
-        fc = pvdict['sunpower'].forecast(start=start,
-                                         end=end,
-                                         history=history,
-                                         deltat=timedelta(minutes=15),
-                                         dataWindowLength=timedelta(hours=1),
-                                         sunrise='yesterday')
+                                        end=end,
+                                        history=history,
+                                        deltat=timedelta(minutes=15),
+                                        dataWindowLength=timedelta(hours=1))
         print(fc)
 
         dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',

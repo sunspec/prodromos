@@ -45,7 +45,8 @@ class PVobj():
                  history,
                  deltat=timedelta(minutes=15),
                  dataWindowLength=timedelta(hours=1),
-                 order=(1, 1, 0)):
+                 order=(1, 1, 0),
+                 sunrise=None):
 
         # wrapper for functions forecast_ARMA and forecast_persistence
 
@@ -64,7 +65,8 @@ class PVobj():
                                         end,
                                         history,
                                         deltat,
-                                        dataWindowLength)
+                                        dataWindowLength,
+                                        sunrise)
 
 
 # Forecast functions
@@ -240,60 +242,69 @@ def clear_sky_model(pvobj, dr):
     Returns
     ----------
     clearSky : pandas Dataframe
-        contains ghi, dhi, dni, poa, aoi, extraI, beam, diffuseSky,
-        diffuseGround, diffuseTotal
+        contains ghi and poa
     """
 
-    # initialize clear sky df and fill with information
-    clearSky = pd.DataFrame(index=pd.DatetimeIndex(dr))
     # get solar position information
     sp = solar_position(pvobj, dr)
-    clearSky['zenith'] = sp['zenith']
-    clearSky['elevation'] = sp['elevation']
+    zenith = sp['zenith']
+    apparent_zenith = sp['zenith']
+    azimuth = sp['azimuth']
 
-    clearSky['extraI'] = pvlib.irradiance.get_extra_radiation(dr)
+#    clearSky['zenith'] = sp['zenith']
+#    clearSky['elevation'] = sp['elevation']
+
+    extraI = pvlib.irradiance.get_extra_radiation(dr)
 
     # calculate GHI using Haurwitz model
-    clearSky['ghi'] = pvlib.clearsky.haurwitz(sp['apparent_zenith'])
+    haurwitz = pvlib.clearsky.haurwitz(apparent_zenith)
+    ghi = haurwitz['ghi']
 
-    clearSky['dni'] = dniDiscIrrad(clearSky)
+    disc = pvlib.irradiance.disc(ghi, zenith, dr)
+    #dniDiscIrrad(clearSky)
+    dni = disc['dni']
 
-    clearSky['dhi'] = DHIfromGHI(clearSky)
+    dhi = ghi - dni * np.sin((90.0 - zenith) * (np.pi / 180))
+    #DHIfromGHI(clearSky)
 
-    clearSky['aoi'] = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
-                                           surface_azimuth=pvobj.azimuth,
-                                           solar_zenith=sp['zenith'],
-                                           solar_azimuth=sp['azimuth'])
+    aoi = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
+                               surface_azimuth=pvobj.azimuth,
+                               solar_zenith=zenith,
+                               solar_azimuth=azimuth)
 
     # Convert the AOI to radians
-    clearSky['aoi'] *= (np.pi/180.0)
+    aoi *= (np.pi/180.0)
 
     # Calculate the POA irradiance based on the given site information
-    clearSky['beam'] = pvlib.irradiance.beam_component(pvobj.tilt,
-                                                       pvobj.azimuth,
-                                                       sp['zenith'],
-                                                       sp['azimuth'],
-                                                       clearSky['dni'])
+    beam = pvlib.irradiance.beam_component(pvobj.tilt,
+                                           pvobj.azimuth,
+                                           zenith,
+                                           azimuth,
+                                           dni)
 
     # Calculate the diffuse radiation from the sky (using Hay and Davies)
-    clearSky['diffuseSky'] = pvlib.irradiance.haydavies(pvobj.tilt,
-                                                        pvobj.azimuth,
-                                                        clearSky['dhi'],
-                                                        clearSky['dni'],
-                                                        clearSky['extraI'],
-                                                        sp['zenith'],
-                                                        sp['azimuth'])
+    diffuseSky = pvlib.irradiance.haydavies(pvobj.tilt,
+                                            pvobj.azimuth,
+                                            dhi,
+                                            dni,
+                                            extraI,
+                                            zenith,
+                                            azimuth)
 
     # Calculate the diffuse radiation from the ground in the plane of array
-    clearSky['diffuseGround'] = pvlib.irradiance.get_ground_diffuse(pvobj.tilt,
-                                                              clearSky['ghi'])
+    diffuseGround = pvlib.irradiance.get_ground_diffuse(pvobj.tilt,
+                                                        ghi)
 
     # Sum the two diffuse to get total diffuse
-    clearSky['diffuseTotal'] = clearSky['diffuseGround'] + \
-                                 clearSky['diffuseSky']
+    diffuseTotal = diffuseGround + diffuseSky
 
     # Sum the diffuse and beam to get the total POA irradicance
-    clearSky['poa'] = clearSky['diffuseTotal'] + clearSky['beam']
+    poa = diffuseTotal + beam
+
+    # initialize clear sky df and fill with information
+    clearSky = pd.DataFrame(index=pd.DatetimeIndex(dr),
+                            data={'ghi': ghi,
+                                  'poa': poa})
 
     return clearSky
 
@@ -384,7 +395,8 @@ def get_clearsky_power(pvobj, dr):
 
 
 def forecast_persistence(pvobj, start, end, history, deltat,
-                         dataWindowLength=timedelta(hours=1)):
+                         dataWindowLength=timedelta(hours=1),
+                         sunrise=None):
 
     """
     Generate forecast for pvobj from start to end at time resolution deltat
@@ -410,9 +422,13 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     dataWindowLenth : timedelta
         time interval in history to be considered
 
+    sunrise : str, default None
+        method for forecasting sunrise hours, values are 'yesterday', None
+
     Returns
     --------
-
+    ac_power : pandas Series
+        forecast from start to end at interval deltat
     """
     # time index for forecast
     dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
@@ -422,19 +438,24 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     doy = pd.Timestamp(local_end).dayofyear
     declination = pvlib.solarposition.declination_spencer71(doy)
     eot = pvlib.solarposition.equation_of_time_spencer71(doy)
-    sr, ss, tr = sun_rise_set_transit_geometric(local_end,
-                                                                  pvobj.lat,
-                                                                  pvobj.lon,
-                                                                  declination,
-                                                                  eot)
+    sr, ss, tr = sun_rise_set_transit_geometric(local_end, pvobj.lat,
+        pvobj.lon, declination, eot)
+
+    doy_yest = pd.Timestamp(local_end - timedelta(days=1)).dayofyear
+    declination_yest = pvlib.solarposition.declination_spencer71(doy_yest)
+    eot_yest = pvlib.solarposition.equation_of_time_spencer71(doy_yest)
+    sr_yest, ss_yest, _ = sun_rise_set_transit_geometric(
+        local_end - timedelta(days=1), pvobj.lat, pvobj.lon, declination_yest,
+        eot_yest)
 
     # length of time for after-sunrise forecast
     delta_fc = dataWindowLength + timedelta(minutes=30)
 
-    if end<sr:
+    if ((end < sr) and (start > ss_yest)):
         # forecast period is before sunrise
         fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
     elif ((start < sr + delta_fc) and
+          (sunrise=='yesterday') and
           (len((history.index >= start - timedelta(days=1)) &
               (history.index - timedelta(days=1) <= end))>2)):
         # forecast period is too near sunrise for history to have valid data
@@ -727,45 +748,45 @@ if __name__ == "__main__":
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 
         fc = pvdict['sunpower'].forecast(start=start,
-                                        end=end,
-                                        history=history,
-                                        deltat=timedelta(minutes=15),
-                                        dataWindowLength=timedelta(hours=1))
-        print(fc)
+                                                end=end,
+                                                history=history,
+                                                deltat=timedelta(minutes=15),
+                                                dataWindowLength=timedelta(hours=1))
 
-        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
-                              end='2018-02-20 00:00:00',
-                              freq='15T').tz_localize('MST')
-        cspower = get_clearsky_power(pvdict['sunpower'], dt)
-        history = cspower['ac_power']
-
-        fc_res = []
-        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
-        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
-            end = start + timedelta(hours=1)
-            fc_res.append(pvdict['sunpower'].forecast(start, end,
-                          history, timedelta(minutes=15),
-                          timedelta(hours=1)))
-            start += timedelta(minutes=30)
-
-        for fc in fc_res:
-            plt.plot(fc, 'x')
-        plt.show()
-
-        # change history
-        history = cspower['ac_power']
-        history.iloc[5:10] *= 5.0;
-        fc_res = []
-        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
-        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
-            end = start + timedelta(hours=1)
-            fc_res.append(pvdict['sunpower'].forecast(start, end,
-                          history, timedelta(minutes=15),
-                          timedelta(hours=1)))
-            start += timedelta(minutes=30)
-
-        plt.plot(history, '-')
-        for fc in fc_res:
-            plt.plot(fc, 'x')
-        plt.show()
-
+#        print(fc)
+#
+#        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
+#                              end='2018-02-20 00:00:00',
+#                              freq='15T').tz_localize('MST')
+#        cspower = get_clearsky_power(pvdict['sunpower'], dt)
+#        history = cspower['ac_power']
+#
+#        fc_res = []
+#        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
+#        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
+#            end = start + timedelta(hours=1)
+#            fc_res.append(pvdict['sunpower'].forecast(start, end,
+#                          history, timedelta(minutes=15),
+#                          timedelta(hours=1)))
+#            start += timedelta(minutes=30)
+#
+##        for fc in fc_res:
+##            plt.plot(fc, 'x')
+##        plt.show()
+#
+#        # change history
+#        history = cspower['ac_power']
+#        history.iloc[5:10] *= 5.0;
+#        fc_res = []
+#        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
+#        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
+#            end = start + timedelta(hours=1)
+#            fc_res.append(pvdict['sunpower'].forecast(start, end,
+#                          history, timedelta(minutes=15),
+#                          timedelta(hours=1)))
+#            start += timedelta(minutes=30)
+#
+#        plt.plot(history, '-')
+#        for fc in fc_res:
+#            plt.plot(fc, 'x')
+#        plt.show()

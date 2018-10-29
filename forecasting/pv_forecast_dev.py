@@ -316,7 +316,6 @@ def calc_clear_index(meas, ub):
     clearIndex = calc_ratio(meas, ub)
     clearIndex[clearIndex == np.inf] = 1.0
     clearIndex[np.isnan(clearIndex)] = 1.0
-    clearIndex[clearIndex > 1.0] = 1.0
 
     return clearIndex
 
@@ -474,7 +473,7 @@ def forecast_persistence(pvobj, start, end, history, deltat,
         cspower = get_clearsky_power(pvobj, fitdata.index)
         
         # compute average clear sky power index
-        cspower_index = calc_ratio(fitdata, cspower['ac_power'])
+        cspower_index = calc_clear_index(fitdata, cspower['ac_power'])
     
         fcst_cspower = get_clearsky_power(pvobj, dr)
     

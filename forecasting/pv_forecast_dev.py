@@ -67,6 +67,9 @@ class PVobj():
                                         deltat,
                                         dataWindowLength,
                                         sunrise)
+        else:
+            raise ValueError('{} is not a valid forecast method'
+                             .format(self.forecast_method))
 
 
 # Forecast functions
@@ -241,8 +244,8 @@ def clear_sky_model(pvobj, dr):
 
     Returns
     ----------
-    clearSky : pandas Dataframe
-        contains ghi and poa
+    poa : pandas Series
+        plane-of-array irradiance
     """
 
     # get solar position information
@@ -301,12 +304,7 @@ def clear_sky_model(pvobj, dr):
     # Sum the diffuse and beam to get the total POA irradicance
     poa = diffuseTotal + beam
 
-    # initialize clear sky df and fill with information
-    clearSky = pd.DataFrame(index=pd.DatetimeIndex(dr),
-                            data={'ghi': ghi,
-                                  'poa': poa})
-
-    return clearSky
+    return poa
 
 
 def calc_clear_index(meas, ub):
@@ -344,7 +342,7 @@ def _get_data_for_persistence(start, history, dataWindowLength):
     start : datetime
         the time for the first forecast value
 
-    history : pandas DataFrame with key 'ac_power'
+    history : pandas Series
         historical values of AC power from which the forecast is made.
 
     dataWindowLenth : timedelta
@@ -378,19 +376,16 @@ def get_clearsky_power(pvobj, dr):
     # calculates clearsky AC power for pvobj at times in dr    
 
 
-    clearsky = clear_sky_model(pvobj, dr)
-    clearsky = clearsky[['ghi', 'poa']]
+    poa = clear_sky_model(pvobj, dr)
 
     # model DC power from POA irradiance
-    clearsky['dc_power'] = clearsky['poa'] / 1000 * pvobj.dc_capacity
+    dc_power = poa / 1000 * pvobj.dc_capacity
 
     # model AC power from DC power, with clipping
-    clearsky['ac_power'] = np.where(clearsky['dc_power']>pvobj.ac_capacity,
-                                    pvobj.ac_capacity,
-                                    clearsky['dc_power']
-                                    )
+    ac_power = np.where(dc_power > pvobj.ac_capacity, pvobj.ac_capacity,
+                        dc_power)
     
-    return clearsky
+    return ac_power
 
 
 def forecast_persistence(pvobj, start, end, history, deltat,
@@ -426,7 +421,7 @@ def forecast_persistence(pvobj, start, end, history, deltat,
 
     Returns
     --------
-    ac_power : pandas Series
+    fcst_power : pandas Series
         forecast from start to end at interval deltat
     """
     # time index for forecast
@@ -463,22 +458,23 @@ def forecast_persistence(pvobj, start, end, history, deltat,
         idata, idr = _align_data_to_forecast(start - timedelta(days=1),
                                              end - timedelta(days=1),
                                              deltat, history)
-        fcst_power = idata.loc[dr - timedelta(days=1), 'ac_power']
+        fcst_power = idata.loc[dr - timedelta(days=1)]
         fcst_power.index = dr
+        fcst_power.name = 'ac_power'
     else:
         # get data for forecast
         fitdata = _get_data_for_persistence(start, history, dataWindowLength)
-    
+
         # get clear-sky power at time of year
         cspower = get_clearsky_power(pvobj, fitdata.index)
-        
+
         # compute average clear sky power index
-        cspower_index = calc_clear_index(fitdata, cspower['ac_power'])
-    
+        cspower_index = calc_clear_index(fitdata, cspower)
+
         fcst_cspower = get_clearsky_power(pvobj, dr)
-    
+
         # forecast ac_power_index using persistence of clear sky power index
-        fcst_power = pd.Series(data=fcst_cspower['ac_power'] * cspower_index.mean(),
+        fcst_power = pd.Series(data=fcst_cspower * cspower_index.mean(),
                                index=dr,
                                name='ac_power')
 
@@ -542,7 +538,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     deltat : timedelta
         interval for the forecast
 
-    history : pandas Series or DataFrame containing key 'ac_power'
+    history : pandas Series named 'ac_power'
         measurements to use for the forecast
 
     Returns

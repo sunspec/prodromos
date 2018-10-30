@@ -358,7 +358,7 @@ def _get_data_for_persistence(start, history, dataWindowLength):
 
     # find last time to include. Earliest of either forecast start or the last
     # time in history
-    end_data_time = min([max(history.index), start])
+    end_data_time = min(history.index[-1], start)
     # select data within dataWindowLength
     fitdata = history.loc[(history.index>=end_data_time - dataWindowLength) &
                          (history.index<=end_data_time)]
@@ -447,7 +447,8 @@ def forecast_persistence(pvobj, start, end, history, deltat,
 
     if ((end < sr) and (start > ss_yest)):
         # forecast period is before sunrise
-        fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
+        fcst_power = pd.Series(data=0.0, index=dr, name='ac_power',
+                               dtype=np.float)
     elif ((start < sr + delta_fc) and
           (sunrise=='yesterday') and
           (len((history.index >= start - timedelta(days=1)) &
@@ -475,8 +476,7 @@ def forecast_persistence(pvobj, start, end, history, deltat,
 
         # forecast ac_power_index using persistence of clear sky power index
         fcst_power = pd.Series(data=fcst_cspower * cspower_index.mean(),
-                               index=dr,
-                               name='ac_power')
+                               index=dr, name='ac_power', dtype=np.float)
 
     return fcst_power
 
@@ -555,7 +555,8 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     history = history.to_frame()
     idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
 
-    tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'])
+    tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'],
+                           dtype=np.float)
 
     # merge history into empty dataframe that has the index we want
     # use outer join to retain time points in history
@@ -574,7 +575,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     # trim to start at first index in idr (in phase with forecast start),
     # and don't overrun history
     idata = newdata[(newdata.index>=min(idr)) &
-                    (newdata.index<=max(history.index))].copy()
+                    (newdata.index<=history.index[-1])].copy()
 
     # calculates minutes out of phase with midnight
     base = int((idr[0].replace(hour=0, second=0) -
@@ -630,7 +631,7 @@ def _get_data_for_ARMA_forecast(start, end, deltat, history,
     idata, idr = _align_data_to_forecast(start, end, deltat, history)
 
     # select aligned data within dataWindowLength
-    end_data_time = max(idata.index)
+    end_data_time = idata.index[-1]
     first_data_time = end_data_time - dataWindowLength
     fitdata = idata.loc[(idata.index>=first_data_time) &
                         (idata.index<=end_data_time)]
@@ -638,7 +639,7 @@ def _get_data_for_ARMA_forecast(start, end, deltat, history,
     # determine number of intervals for forecast. start with first interval
     # after the data used to fit the model. +1 because steps counts intervals
     # we want the interval after the last entry in fdr
-    f_intervals = len(idr[idr>max(fitdata.index)]) + 1
+    f_intervals = len(idr[idr>fitdata.index[-1]]) + 1
 
     return fitdata, f_intervals
 
@@ -738,7 +739,8 @@ if __name__ == "__main__":
                                  '2018-02-18T16:30:00',
                                  '2018-02-18T16:45:00']]
         values = [300.0, 400.1, 500.2, 600.3]
-        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps))
+        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps),
+                            dtype=np.float)
         start = parser.parse('2018-02-18T17:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 

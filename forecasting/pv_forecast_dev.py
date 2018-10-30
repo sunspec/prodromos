@@ -552,6 +552,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
         phase with forecast times
 
     """
+    history.name = 'ac_power' # so that we can use pd.Dataframe.merge
     history = history.to_frame()
     idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
 
@@ -678,8 +679,8 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
 
     # TODO: input validation
 
-    fitdata, f_intervals = _get_data_for_ARMA_forecast(pvobj, start, end,
-                                                       deltat, history,
+    fitdata, f_intervals = _get_data_for_ARMA_forecast(start, end, deltat,
+                                                       history,
                                                        dataWindowLength)
 
     # TODO: model identification logic
@@ -730,7 +731,7 @@ if __name__ == "__main__":
                                         tz=USMtn,
                                         tilt=35,
                                         azimuth=180,
-                                        forecast_method='persistence')
+                                        forecast_method='arma')
 
         from dateutil import parser
         timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)

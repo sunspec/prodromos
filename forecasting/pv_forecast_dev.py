@@ -5,6 +5,7 @@ import pvlib
 import pytz
 from datetime import datetime
 from datetime import timedelta
+from math import ceil
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -51,7 +52,7 @@ class PVobj():
         # wrapper for functions forecast_ARMA and forecast_persistence
 
         if self.forecast_method=='arma':
-            return forecast_ARMA(self,
+            return forecast_ARMA(self, 
                                  start,
                                  end,
                                  history,
@@ -180,6 +181,23 @@ def sun_rise_set_transit_geometric(times, latitude, longitude, declination,
     sunset = _local_times_from_hours_since_midnight(times, sunset_hour)
     transit = _local_times_from_hours_since_midnight(times, transit_hour)
     return sunrise, sunset, transit
+
+
+def get_sr_ss(pvobj, dt):
+    """
+    Returns sunrise and sunset for local datetime dt at location of pbobj
+    """
+    # for sunrise and sunset calculation, time must be in timezone for location
+    local_dt = dt.astimezone(pvobj.timezone)
+    doy = pd.Timestamp(local_dt).dayofyear
+    declination = pvlib.solarposition.declination_spencer71(doy)
+    eot = pvlib.solarposition.equation_of_time_spencer71(doy)
+    sr, ss, _ = sun_rise_set_transit_geometric(local_dt, pvobj.lat,
+        pvobj.lon, declination, eot)
+    if isinstance(dt, pd.Timestamp):
+        return sr[0], ss[0]
+    else:  # return as pd.DatetimeIndex
+        return sr, ss
 
 
 def dniDiscIrrad(weather):
@@ -427,20 +445,8 @@ def forecast_persistence(pvobj, start, end, history, deltat,
     # time index for forecast
     dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
 
-    # for sunrise and sunset calculation, time must be in timezone for location
-    local_end = end.astimezone(pvobj.timezone)
-    doy = pd.Timestamp(local_end).dayofyear
-    declination = pvlib.solarposition.declination_spencer71(doy)
-    eot = pvlib.solarposition.equation_of_time_spencer71(doy)
-    sr, ss, tr = sun_rise_set_transit_geometric(local_end, pvobj.lat,
-        pvobj.lon, declination, eot)
-
-    doy_yest = pd.Timestamp(local_end - timedelta(days=1)).dayofyear
-    declination_yest = pvlib.solarposition.declination_spencer71(doy_yest)
-    eot_yest = pvlib.solarposition.equation_of_time_spencer71(doy_yest)
-    sr_yest, ss_yest, _ = sun_rise_set_transit_geometric(
-        local_end - timedelta(days=1), pvobj.lat, pvobj.lon, declination_yest,
-        eot_yest)
+    sr, ss = get_sr_ss(pvobj, end)
+    sr_yest, ss_yest = get_sr_ss(pvobj, end - timedelta(days=1))
 
     # length of time for after-sunrise forecast
     delta_fc = dataWindowLength + timedelta(minutes=30)
@@ -591,126 +597,196 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     return idata, idr
 
 
+def get_num_intervals(end, start, deltat):
+    """
+    Calculate number of intervals of length deltat from end working back to
+    start, to include start.
+
+    Parameters
+    ------------
+    end : datetime
+
+    start : datetime
+
+    deltat : timedelta
+
+    """
+    return ceil((end - start).total_seconds() / deltat.seconds)
+
+
 def _get_data_for_ARMA_forecast(start, end, deltat, history,
                                 dataWindowLength):
 
     """
-    Returns interpolated history data in phase with forecast start time and
-    time interval.
+    Select data from history for fitting the forecast model.
 
     Parameters
     -----------
 
     start : datetime
-        the time for the first forecast value
+        the first time in the forecast
 
     end : datetime
-        the last time to be forecast
-
-    deltat : timedelta
-        the time interval for the forecast
-
-    history : pandas DataFrame with key 'ac_power'
-        historical values of AC power from which the forecast is made.
-
-    dataWindowLenth : timedelta
-        time interval in history to be considered
-
-    Returns
-    ----------
-    fitdata :
-        data from history aligned to be in phase with requested forecast
-
-    fdr : pandas DatetimeIndex
-        time index for requested forecast
-
-    steps : integer
-        number of time steps in the forecast forecast
-    """
-
-    # align history data with forecast start time and interval
-    idata, idr = _align_data_to_forecast(start, end, deltat, history)
-
-    # select aligned data within dataWindowLength
-    end_data_time = idata.index[-1]
-    first_data_time = end_data_time - dataWindowLength
-    fitdata = idata.loc[(idata.index>=first_data_time) &
-                        (idata.index<=end_data_time)]
-
-    # determine number of intervals for forecast. start with first interval
-    # after the data used to fit the model. +1 because steps counts intervals
-    # we want the interval after the last entry in fdr
-    f_intervals = len(idr[idr>fitdata.index[-1]]) + 1
-
-    return fitdata, f_intervals
-
-
-def forecast_ARMA(pvobj, start, end, history, deltat,
-                  dataWindowLength=timedelta(hours=1), order=None):
-
-    """
-    Generate forecast from start to end at time resolution deltat
-    using an ARMA model of order fit to AC power data in history.
-
-    Parameters
-    -----------
-
-    pvobj : an instance of type PVobj
-
-    start : datetime
-        the time for the first forecast value
-
-    end : datetime
-        the last time to be forecast
+        the last time in be forecast
 
     deltat : timedelta
         the time interval for the forecast
 
     history : pandas Series
-        historical values of AC power from which the forecast is made.
+        historical values of the quantity to be forecast
+
+    Returns
+    ----------
+    fitdata : pandas Series
+        data from history aligned to be in phase with requested forecast
+
+    f_intervals : integer
+        number of time steps in the forecast
+    """
+
+    # find number of deltat intervals between start and last time in history
+    # assumes that start > max(history.index)
+    if start < history.index[-1]:
+        # truncate history
+        history = history.loc[history.index < start]
+
+    K = get_num_intervals(start, history.index[-1], deltat)
+
+    # find number of deltat intervals covering dataWindowLength in history
+    N = get_num_intervals(start - K*deltat,
+                          start - K*deltat - dataWindowLength,
+                          deltat)
+
+    # start time of resampled history in phase with forecast start
+    resample_start = start - (K + N - 1) * deltat
+    resample_end = start - K * deltat
+
+    # calculate base time for resample, minutes out of phase with midnight
+    midnight = resample_start.replace(hour=0, minute=0, second=0)
+    first_after_midnight = resample_start - \
+                    int((resample_start - midnight) / deltat) * deltat
+    base = (first_after_midnight - midnight).total_seconds() / 60
+
+    # resample history
+    idata = history.resample(rule=pd.to_timedelta(deltat),
+                             closed='left',
+                             label='left',
+                             base=base).mean()
+
+    # extract window from resampled history
+    return idata.loc[(idata.index>=resample_start) &
+                        (idata.index<=resample_end)].copy()
+
+
+def forecast_ARMA(pvobj, start, end, history, deltat,
+                  dataWindowLength=timedelta(hours=1),
+                  order=None,
+                  start_params=None):
+
+    """
+    Generate forecast from start to end with steps deltat
+    using an ARMA model fit to data in history.
+
+    Parameters
+    -----------
+
+    start : datetime
+        the first time to be forecast
+
+    end : datetime
+        the last time to be forecast
+
+    deltat : timedelta
+        the time step for the forecast
+
+    history : pandas Series
+        historical values from which the forecast is made.
+
+    dataWindowLenth : timedelta, default one hour
+        time interval for data in history to be considered for model fitting
 
     order : tuple of three integers
         autoregressive, difference, and moving average orders for an ARMA
         forecast model
 
-    dataWindowLenth : timedelta, default one hour
+    start_params : list of float
+        initial guess of model parameters, one value for each autoregressive
+        and moving average coefficient, followed by the value for the variance
+        term
+
 
     """
 
     # TODO: input validation
 
-    fitdata, f_intervals = _get_data_for_ARMA_forecast(start, end, deltat,
-                                                       history,
-                                                       dataWindowLength)
+    # create datetime index for forecast
+    fdr = pd.DatetimeIndex(start=start, end=end, freq=pd.to_timedelta(deltat))
+
+    # get time-averaged data from history over specified data window and that
+    # is in phase with forecast times
+    fitdata = _get_data_for_ARMA_forecast(start, end,
+                                          deltat, history,
+                                          dataWindowLength)
 
     # TODO: model identification logic
 
     # fit model of order (p, d, q)
-    # defaults:
+    # defaults to first order differencing to help with non-stationarity
     if not order:
         if deltat.total_seconds()>=15*60:
             # use MA process for time intervals 15 min or longer
             p = 0
             d = 1
             q = 1
+            start_params = [1, 0]
         else:
-            # use AR process
+            # use AR process for time intervals < 15 min
             p = 1
             d = 1
             q = 0
+            start_params = [0, 1]
         order = (p, d, q)
 
     model = sm.tsa.statespace.SARIMAX(fitdata,
                                       trend='n',
                                       order=order)
-    results = model.fit()
 
+    # if not provided, generate guess of model parameters, helps overcome 
+    # non-stationarity
+    if not start_params:
+        # generate a list with one entry '0' for each AR or MA parameter 
+        # plus an entry '1' for the variance parameter
+        start_params = []
+        for i in range(0, order[0]+order[2]):
+            start_params.append(0)
+        start_params.append(1)
+
+    # generate the ARMA model object
+    results = model.fit(start_params=start_params)
+
+    # total intervals to forecast from end of data to end of forecast
+    idr = pd.DatetimeIndex(start=fitdata.index[-1],
+                           end=end,
+                           freq=pd.to_timedelta(deltat))
+
+    f_intervals = len(idr) - 1 # first time in idr is last data point
+
+    # forecast
     f = results.forecast(f_intervals)
 
-    # create datetime index for forecast
-    fdr = pd.DatetimeIndex(start=start, end=end, freq=pd.to_timedelta(deltat))
+    # return the requested forecast times
+    f = f[fdr]
+    # limit forecast to 0.0 and clear-sky power
+    # get clear-sky power at time of year
+    cspower = get_clearsky_power(pvobj, fdr)
+    f[f > cspower] = cspower
+    f[f < 0] = 0.0
+    sr, ss = get_sr_ss(pvobj, end)
+    f[f.index < sr] = 0.0
+    f[f.index > ss] = 0.0
 
     return f[fdr]
+
 
 
 if __name__ == "__main__":
@@ -751,7 +827,7 @@ if __name__ == "__main__":
                                                 deltat=timedelta(minutes=15),
                                                 dataWindowLength=timedelta(hours=1))
 
-#        print(fc)
+        print(fc)
 #
 #        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
 #                              end='2018-02-20 00:00:00',

@@ -16,7 +16,9 @@ class PVobj():
     # create an instance of a PV class object
     def __init__(self, derid, lat, lon, alt, tz,
                  tilt, azimuth, dc_capacity, ac_capacity,
-                 forecast_method='persistence', surrogateid=None):
+                 tracking=False, max_angle=90, backtrack=True, gcr=2.0/7.0,
+                 forecast_method='persistence', sunrise=None,
+                 surrogateid=None):
 
         self.derid = derid
         # TODO: using a surrogate in forecasting is NOT implemented
@@ -29,14 +31,23 @@ class PVobj():
                ' : no forecast method specified, default to persistence'
             raise RuntimeWarning(warnstring)
             self.forecast_method = None
+        self.sunrise = sunrise
         self.dc_capacity = dc_capacity
         self.ac_capacity = ac_capacity
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.timezone = tz
-        self.tilt = tilt
-        self.azimuth = azimuth
+        self.tracking = tracking
+        if not tracking:
+            self.tilt = tilt
+            self.azimuth = azimuth
+        else:
+            self.axis_tilt = tilt
+            self.axis_azimuth = azimuth
+            self.max_angle = max_angle
+            self.backtrack = backtrack
+            self.gcr = gcr
 
 
     # PVobj member functions
@@ -66,8 +77,7 @@ class PVobj():
                                         end,
                                         history,
                                         deltat,
-                                        dataWindowLength,
-                                        sunrise)
+                                        dataWindowLength)
         else:
             raise ValueError('{} is not a valid forecast method'
                              .format(self.forecast_method))
@@ -194,7 +204,7 @@ def get_sr_ss(pvobj, dt):
     eot = pvlib.solarposition.equation_of_time_spencer71(doy)
     sr, ss, _ = sun_rise_set_transit_geometric(local_dt, pvobj.lat,
         pvobj.lon, declination, eot)
-    if isinstance(dt, pd.Timestamp):
+    if len(sr)==1: # return as datetime
         return sr[0], ss[0]
     else:  # return as pd.DatetimeIndex
         return sr, ss
@@ -247,6 +257,18 @@ def DHIfromGHI(weather):
              np.sin(weather['elevation'] * (np.pi / 180))
 
 
+def get_tracker_position(pvobj, solar_zenith, solar_azimuth):
+    """
+    Calculates angle of incidence aoi, panel tilt and panel azimuth for
+    a single axis tracking system
+    """
+    
+    return pvlib.tracking.singleaxis(solar_zenith, solar_azimuth,
+                                     pvobj.axis_tilt, pvobj.axis_azimuth,
+                                     pvobj.max_angle, pvobj.backtrack,
+                                     pvobj.gcr)
+
+
 def clear_sky_model(pvobj, dr):
     """
     Calculate clear-sky irradiance (GHI, DHI, DNI and POA) and related
@@ -270,7 +292,7 @@ def clear_sky_model(pvobj, dr):
     sp = solar_position(pvobj, dr)
     zenith = sp['zenith']
     apparent_zenith = sp['zenith']
-    azimuth = sp['azimuth']
+    solar_azimuth = sp['azimuth']
 
 #    clearSky['zenith'] = sp['zenith']
 #    clearSky['elevation'] = sp['elevation']
@@ -286,35 +308,42 @@ def clear_sky_model(pvobj, dr):
     dni = disc['dni']
 
     dhi = ghi - dni * np.sin((90.0 - zenith) * (np.pi / 180))
-    #DHIfromGHI(clearSky)
 
-    aoi = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
-                               surface_azimuth=pvobj.azimuth,
-                               solar_zenith=zenith,
-                               solar_azimuth=azimuth)
+    if not pvobj.tracking:
+        aoi = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
+                                   surface_azimuth=pvobj.azimuth,
+                                   solar_zenith=zenith,
+                                   solar_azimuth=solar_azimuth)
+        tilt = pvobj.tilt
+        azimuth = pvobj.azimuth
+    else:
+        result = get_tracker_position(pvobj, solar_zenith=apparent_zenith,
+                                      solar_azimuth=solar_azimuth)
+        aoi = result['aoi']
+        tilt = result['surface_tilt']
+        azimuth = result['surface_azimuth']
 
     # Convert the AOI to radians
     aoi *= (np.pi/180.0)
 
     # Calculate the POA irradiance based on the given site information
-    beam = pvlib.irradiance.beam_component(pvobj.tilt,
-                                           pvobj.azimuth,
-                                           zenith,
+    beam = pvlib.irradiance.beam_component(tilt,
                                            azimuth,
+                                           zenith,
+                                           solar_azimuth,
                                            dni)
 
     # Calculate the diffuse radiation from the sky (using Hay and Davies)
-    diffuseSky = pvlib.irradiance.haydavies(pvobj.tilt,
-                                            pvobj.azimuth,
+    diffuseSky = pvlib.irradiance.haydavies(tilt,
+                                            azimuth,
                                             dhi,
                                             dni,
                                             extraI,
                                             zenith,
-                                            azimuth)
+                                            solar_azimuth)
 
     # Calculate the diffuse radiation from the ground in the plane of array
-    diffuseGround = pvlib.irradiance.get_ground_diffuse(pvobj.tilt,
-                                                        ghi)
+    diffuseGround = pvlib.irradiance.get_ground_diffuse(tilt, ghi)
 
     # Sum the two diffuse to get total diffuse
     diffuseTotal = diffuseGround + diffuseSky
@@ -807,7 +836,12 @@ if __name__ == "__main__":
                                         tz=USMtn,
                                         tilt=35,
                                         azimuth=180,
-                                        forecast_method='arma')
+                                        tracking=True,
+                                        max_angle=90,
+                                        backtrack=True,
+                                        gcr=2.0/7.0,
+                                        forecast_method='arma',
+                                        sunrise='yesterday')
 
         from dateutil import parser
         timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)
@@ -822,10 +856,10 @@ if __name__ == "__main__":
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 
         fc = pvdict['sunpower'].forecast(start=start,
-                                                end=end,
-                                                history=history,
-                                                deltat=timedelta(minutes=15),
-                                                dataWindowLength=timedelta(hours=1))
+                                         end=end,
+                                         history=history,
+                                         deltat=timedelta(minutes=15),
+                                         dataWindowLength=timedelta(hours=1))
 
         print(fc)
 #

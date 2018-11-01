@@ -5,6 +5,7 @@ import pvlib
 import pytz
 from datetime import datetime
 from datetime import timedelta
+from math import ceil
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -15,7 +16,9 @@ class PVobj():
     # create an instance of a PV class object
     def __init__(self, derid, lat, lon, alt, tz,
                  tilt, azimuth, dc_capacity, ac_capacity,
-                 forecast_method='persistence', surrogateid=None):
+                 tracking=False, max_angle=90, backtrack=True, gcr=2.0/7.0,
+                 forecast_method='persistence', sunrise=None,
+                 surrogateid=None):
 
         self.derid = derid
         # TODO: using a surrogate in forecasting is NOT implemented
@@ -28,14 +31,23 @@ class PVobj():
                ' : no forecast method specified, default to persistence'
             raise RuntimeWarning(warnstring)
             self.forecast_method = None
+        self.sunrise = sunrise
         self.dc_capacity = dc_capacity
         self.ac_capacity = ac_capacity
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.timezone = tz
-        self.tilt = tilt
-        self.azimuth = azimuth
+        self.tracking = tracking
+        if not tracking:
+            self.tilt = tilt
+            self.azimuth = azimuth
+        else:
+            self.axis_tilt = tilt
+            self.axis_azimuth = azimuth
+            self.max_angle = max_angle
+            self.backtrack = backtrack
+            self.gcr = gcr
 
 
     # PVobj member functions
@@ -51,7 +63,7 @@ class PVobj():
         # wrapper for functions forecast_ARMA and forecast_persistence
 
         if self.forecast_method=='arma':
-            return forecast_ARMA(self,
+            return forecast_ARMA(self, 
                                  start,
                                  end,
                                  history,
@@ -65,8 +77,10 @@ class PVobj():
                                         end,
                                         history,
                                         deltat,
-                                        dataWindowLength,
-                                        sunrise)
+                                        dataWindowLength)
+        else:
+            raise ValueError('{} is not a valid forecast method'
+                             .format(self.forecast_method))
 
 
 # Forecast functions
@@ -179,6 +193,23 @@ def sun_rise_set_transit_geometric(times, latitude, longitude, declination,
     return sunrise, sunset, transit
 
 
+def get_sr_ss(pvobj, dt):
+    """
+    Returns sunrise and sunset for local datetime dt at location of pbobj
+    """
+    # for sunrise and sunset calculation, time must be in timezone for location
+    local_dt = dt.astimezone(pvobj.timezone)
+    doy = pd.Timestamp(local_dt).dayofyear
+    declination = pvlib.solarposition.declination_spencer71(doy)
+    eot = pvlib.solarposition.equation_of_time_spencer71(doy)
+    sr, ss, _ = sun_rise_set_transit_geometric(local_dt, pvobj.lat,
+        pvobj.lon, declination, eot)
+    if len(sr)==1: # return as datetime
+        return sr[0], ss[0]
+    else:  # return as pd.DatetimeIndex
+        return sr, ss
+
+
 def dniDiscIrrad(weather):
     """
     Use the DISC model to estimate the DNI from GHI
@@ -226,6 +257,18 @@ def DHIfromGHI(weather):
              np.sin(weather['elevation'] * (np.pi / 180))
 
 
+def get_tracker_position(pvobj, solar_zenith, solar_azimuth):
+    """
+    Calculates angle of incidence aoi, panel tilt and panel azimuth for
+    a single axis tracking system
+    """
+    
+    return pvlib.tracking.singleaxis(solar_zenith, solar_azimuth,
+                                     pvobj.axis_tilt, pvobj.axis_azimuth,
+                                     pvobj.max_angle, pvobj.backtrack,
+                                     pvobj.gcr)
+
+
 def clear_sky_model(pvobj, dr):
     """
     Calculate clear-sky irradiance (GHI, DHI, DNI and POA) and related
@@ -241,15 +284,15 @@ def clear_sky_model(pvobj, dr):
 
     Returns
     ----------
-    clearSky : pandas Dataframe
-        contains ghi and poa
+    poa : pandas Series
+        plane-of-array irradiance
     """
 
     # get solar position information
     sp = solar_position(pvobj, dr)
     zenith = sp['zenith']
     apparent_zenith = sp['zenith']
-    azimuth = sp['azimuth']
+    solar_azimuth = sp['azimuth']
 
 #    clearSky['zenith'] = sp['zenith']
 #    clearSky['elevation'] = sp['elevation']
@@ -265,35 +308,42 @@ def clear_sky_model(pvobj, dr):
     dni = disc['dni']
 
     dhi = ghi - dni * np.sin((90.0 - zenith) * (np.pi / 180))
-    #DHIfromGHI(clearSky)
 
-    aoi = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
-                               surface_azimuth=pvobj.azimuth,
-                               solar_zenith=zenith,
-                               solar_azimuth=azimuth)
+    if not pvobj.tracking:
+        aoi = pvlib.irradiance.aoi(surface_tilt=pvobj.tilt,
+                                   surface_azimuth=pvobj.azimuth,
+                                   solar_zenith=zenith,
+                                   solar_azimuth=solar_azimuth)
+        tilt = pvobj.tilt
+        azimuth = pvobj.azimuth
+    else:
+        result = get_tracker_position(pvobj, solar_zenith=apparent_zenith,
+                                      solar_azimuth=solar_azimuth)
+        aoi = result['aoi']
+        tilt = result['surface_tilt']
+        azimuth = result['surface_azimuth']
 
     # Convert the AOI to radians
     aoi *= (np.pi/180.0)
 
     # Calculate the POA irradiance based on the given site information
-    beam = pvlib.irradiance.beam_component(pvobj.tilt,
-                                           pvobj.azimuth,
-                                           zenith,
+    beam = pvlib.irradiance.beam_component(tilt,
                                            azimuth,
+                                           zenith,
+                                           solar_azimuth,
                                            dni)
 
     # Calculate the diffuse radiation from the sky (using Hay and Davies)
-    diffuseSky = pvlib.irradiance.haydavies(pvobj.tilt,
-                                            pvobj.azimuth,
+    diffuseSky = pvlib.irradiance.haydavies(tilt,
+                                            azimuth,
                                             dhi,
                                             dni,
                                             extraI,
                                             zenith,
-                                            azimuth)
+                                            solar_azimuth)
 
     # Calculate the diffuse radiation from the ground in the plane of array
-    diffuseGround = pvlib.irradiance.get_ground_diffuse(pvobj.tilt,
-                                                        ghi)
+    diffuseGround = pvlib.irradiance.get_ground_diffuse(tilt, ghi)
 
     # Sum the two diffuse to get total diffuse
     diffuseTotal = diffuseGround + diffuseSky
@@ -301,12 +351,7 @@ def clear_sky_model(pvobj, dr):
     # Sum the diffuse and beam to get the total POA irradicance
     poa = diffuseTotal + beam
 
-    # initialize clear sky df and fill with information
-    clearSky = pd.DataFrame(index=pd.DatetimeIndex(dr),
-                            data={'ghi': ghi,
-                                  'poa': poa})
-
-    return clearSky
+    return poa
 
 
 def calc_clear_index(meas, ub):
@@ -344,7 +389,7 @@ def _get_data_for_persistence(start, history, dataWindowLength):
     start : datetime
         the time for the first forecast value
 
-    history : pandas DataFrame with key 'ac_power'
+    history : pandas Series
         historical values of AC power from which the forecast is made.
 
     dataWindowLenth : timedelta
@@ -360,7 +405,7 @@ def _get_data_for_persistence(start, history, dataWindowLength):
 
     # find last time to include. Earliest of either forecast start or the last
     # time in history
-    end_data_time = min([max(history.index), start])
+    end_data_time = min(history.index[-1], start)
     # select data within dataWindowLength
     fitdata = history.loc[(history.index>=end_data_time - dataWindowLength) &
                          (history.index<=end_data_time)]
@@ -378,19 +423,16 @@ def get_clearsky_power(pvobj, dr):
     # calculates clearsky AC power for pvobj at times in dr    
 
 
-    clearsky = clear_sky_model(pvobj, dr)
-    clearsky = clearsky[['ghi', 'poa']]
+    poa = clear_sky_model(pvobj, dr)
 
     # model DC power from POA irradiance
-    clearsky['dc_power'] = clearsky['poa'] / 1000 * pvobj.dc_capacity
+    dc_power = poa / 1000 * pvobj.dc_capacity
 
     # model AC power from DC power, with clipping
-    clearsky['ac_power'] = np.where(clearsky['dc_power']>pvobj.ac_capacity,
-                                    pvobj.ac_capacity,
-                                    clearsky['dc_power']
-                                    )
+    ac_power = np.where(dc_power > pvobj.ac_capacity, pvobj.ac_capacity,
+                        dc_power)
     
-    return clearsky
+    return ac_power
 
 
 def forecast_persistence(pvobj, start, end, history, deltat,
@@ -426,33 +468,22 @@ def forecast_persistence(pvobj, start, end, history, deltat,
 
     Returns
     --------
-    ac_power : pandas Series
+    fcst_power : pandas Series
         forecast from start to end at interval deltat
     """
     # time index for forecast
     dr = pd.DatetimeIndex(start=start, end=end, freq=deltat)
 
-    # for sunrise and sunset calculation, time must be in timezone for location
-    local_end = end.astimezone(pvobj.timezone)
-    doy = pd.Timestamp(local_end).dayofyear
-    declination = pvlib.solarposition.declination_spencer71(doy)
-    eot = pvlib.solarposition.equation_of_time_spencer71(doy)
-    sr, ss, tr = sun_rise_set_transit_geometric(local_end, pvobj.lat,
-        pvobj.lon, declination, eot)
-
-    doy_yest = pd.Timestamp(local_end - timedelta(days=1)).dayofyear
-    declination_yest = pvlib.solarposition.declination_spencer71(doy_yest)
-    eot_yest = pvlib.solarposition.equation_of_time_spencer71(doy_yest)
-    sr_yest, ss_yest, _ = sun_rise_set_transit_geometric(
-        local_end - timedelta(days=1), pvobj.lat, pvobj.lon, declination_yest,
-        eot_yest)
+    sr, ss = get_sr_ss(pvobj, end)
+    sr_yest, ss_yest = get_sr_ss(pvobj, end - timedelta(days=1))
 
     # length of time for after-sunrise forecast
     delta_fc = dataWindowLength + timedelta(minutes=30)
 
     if ((end < sr) and (start > ss_yest)):
         # forecast period is before sunrise
-        fcst_power = pd.Series(data=0.0, index=dr, name='ac_power')
+        fcst_power = pd.Series(data=0.0, index=dr, name='ac_power',
+                               dtype=np.float)
     elif ((start < sr + delta_fc) and
           (sunrise=='yesterday') and
           (len((history.index >= start - timedelta(days=1)) &
@@ -463,24 +494,24 @@ def forecast_persistence(pvobj, start, end, history, deltat,
         idata, idr = _align_data_to_forecast(start - timedelta(days=1),
                                              end - timedelta(days=1),
                                              deltat, history)
-        fcst_power = idata.loc[dr - timedelta(days=1), 'ac_power']
+        fcst_power = idata.loc[dr - timedelta(days=1)]
         fcst_power.index = dr
+        fcst_power.name = 'ac_power'
     else:
         # get data for forecast
         fitdata = _get_data_for_persistence(start, history, dataWindowLength)
-    
+
         # get clear-sky power at time of year
         cspower = get_clearsky_power(pvobj, fitdata.index)
-        
+
         # compute average clear sky power index
-        cspower_index = calc_clear_index(fitdata, cspower['ac_power'])
-    
+        cspower_index = calc_clear_index(fitdata, cspower)
+
         fcst_cspower = get_clearsky_power(pvobj, dr)
-    
+
         # forecast ac_power_index using persistence of clear sky power index
-        fcst_power = pd.Series(data=fcst_cspower['ac_power'] * cspower_index.mean(),
-                               index=dr,
-                               name='ac_power')
+        fcst_power = pd.Series(data=fcst_cspower * cspower_index.mean(),
+                               index=dr, name='ac_power', dtype=np.float)
 
     return fcst_power
 
@@ -542,7 +573,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     deltat : timedelta
         interval for the forecast
 
-    history : pandas Series or DataFrame containing key 'ac_power'
+    history : pandas Series named 'ac_power'
         measurements to use for the forecast
 
     Returns
@@ -556,10 +587,12 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
         phase with forecast times
 
     """
+    history.name = 'ac_power' # so that we can use pd.Dataframe.merge
     history = history.to_frame()
     idr = _extend_datetime_index(fstart, fend, deltat, min(history.index))
 
-    tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'])
+    tmpdata = pd.DataFrame(index=idr, data=np.nan, columns=['ac_power'],
+                           dtype=np.float)
 
     # merge history into empty dataframe that has the index we want
     # use outer join to retain time points in history
@@ -578,7 +611,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     # trim to start at first index in idr (in phase with forecast start),
     # and don't overrun history
     idata = newdata[(newdata.index>=min(idr)) &
-                    (newdata.index<=max(history.index))].copy()
+                    (newdata.index<=history.index[-1])].copy()
 
     # calculates minutes out of phase with midnight
     base = int((idr[0].replace(hour=0, second=0) -
@@ -593,126 +626,196 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
     return idata, idr
 
 
+def get_num_intervals(end, start, deltat):
+    """
+    Calculate number of intervals of length deltat from end working back to
+    start, to include start.
+
+    Parameters
+    ------------
+    end : datetime
+
+    start : datetime
+
+    deltat : timedelta
+
+    """
+    return ceil((end - start).total_seconds() / deltat.seconds)
+
+
 def _get_data_for_ARMA_forecast(start, end, deltat, history,
                                 dataWindowLength):
 
     """
-    Returns interpolated history data in phase with forecast start time and
-    time interval.
+    Select data from history for fitting the forecast model.
 
     Parameters
     -----------
 
     start : datetime
-        the time for the first forecast value
+        the first time in the forecast
 
     end : datetime
-        the last time to be forecast
-
-    deltat : timedelta
-        the time interval for the forecast
-
-    history : pandas DataFrame with key 'ac_power'
-        historical values of AC power from which the forecast is made.
-
-    dataWindowLenth : timedelta
-        time interval in history to be considered
-
-    Returns
-    ----------
-    fitdata :
-        data from history aligned to be in phase with requested forecast
-
-    fdr : pandas DatetimeIndex
-        time index for requested forecast
-
-    steps : integer
-        number of time steps in the forecast forecast
-    """
-
-    # align history data with forecast start time and interval
-    idata, idr = _align_data_to_forecast(start, end, deltat, history)
-
-    # select aligned data within dataWindowLength
-    end_data_time = max(idata.index)
-    first_data_time = end_data_time - dataWindowLength
-    fitdata = idata.loc[(idata.index>=first_data_time) &
-                        (idata.index<=end_data_time)]
-
-    # determine number of intervals for forecast. start with first interval
-    # after the data used to fit the model. +1 because steps counts intervals
-    # we want the interval after the last entry in fdr
-    f_intervals = len(idr[idr>max(fitdata.index)]) + 1
-
-    return fitdata, f_intervals
-
-
-def forecast_ARMA(pvobj, start, end, history, deltat,
-                  dataWindowLength=timedelta(hours=1), order=None):
-
-    """
-    Generate forecast from start to end at time resolution deltat
-    using an ARMA model of order fit to AC power data in history.
-
-    Parameters
-    -----------
-
-    pvobj : an instance of type PVobj
-
-    start : datetime
-        the time for the first forecast value
-
-    end : datetime
-        the last time to be forecast
+        the last time in be forecast
 
     deltat : timedelta
         the time interval for the forecast
 
     history : pandas Series
-        historical values of AC power from which the forecast is made.
+        historical values of the quantity to be forecast
+
+    Returns
+    ----------
+    fitdata : pandas Series
+        data from history aligned to be in phase with requested forecast
+
+    f_intervals : integer
+        number of time steps in the forecast
+    """
+
+    # find number of deltat intervals between start and last time in history
+    # assumes that start > max(history.index)
+    if start < history.index[-1]:
+        # truncate history
+        history = history.loc[history.index < start]
+
+    K = get_num_intervals(start, history.index[-1], deltat)
+
+    # find number of deltat intervals covering dataWindowLength in history
+    N = get_num_intervals(start - K*deltat,
+                          start - K*deltat - dataWindowLength,
+                          deltat)
+
+    # start time of resampled history in phase with forecast start
+    resample_start = start - (K + N - 1) * deltat
+    resample_end = start - K * deltat
+
+    # calculate base time for resample, minutes out of phase with midnight
+    midnight = resample_start.replace(hour=0, minute=0, second=0)
+    first_after_midnight = resample_start - \
+                    int((resample_start - midnight) / deltat) * deltat
+    base = (first_after_midnight - midnight).total_seconds() / 60
+
+    # resample history
+    idata = history.resample(rule=pd.to_timedelta(deltat),
+                             closed='left',
+                             label='left',
+                             base=base).mean()
+
+    # extract window from resampled history
+    return idata.loc[(idata.index>=resample_start) &
+                        (idata.index<=resample_end)].copy()
+
+
+def forecast_ARMA(pvobj, start, end, history, deltat,
+                  dataWindowLength=timedelta(hours=1),
+                  order=None,
+                  start_params=None):
+
+    """
+    Generate forecast from start to end with steps deltat
+    using an ARMA model fit to data in history.
+
+    Parameters
+    -----------
+
+    start : datetime
+        the first time to be forecast
+
+    end : datetime
+        the last time to be forecast
+
+    deltat : timedelta
+        the time step for the forecast
+
+    history : pandas Series
+        historical values from which the forecast is made.
+
+    dataWindowLenth : timedelta, default one hour
+        time interval for data in history to be considered for model fitting
 
     order : tuple of three integers
         autoregressive, difference, and moving average orders for an ARMA
         forecast model
 
-    dataWindowLenth : timedelta, default one hour
+    start_params : list of float
+        initial guess of model parameters, one value for each autoregressive
+        and moving average coefficient, followed by the value for the variance
+        term
+
 
     """
 
     # TODO: input validation
 
-    fitdata, f_intervals = _get_data_for_ARMA_forecast(pvobj, start, end,
-                                                       deltat, history,
-                                                       dataWindowLength)
+    # create datetime index for forecast
+    fdr = pd.DatetimeIndex(start=start, end=end, freq=pd.to_timedelta(deltat))
+
+    # get time-averaged data from history over specified data window and that
+    # is in phase with forecast times
+    fitdata = _get_data_for_ARMA_forecast(start, end,
+                                          deltat, history,
+                                          dataWindowLength)
 
     # TODO: model identification logic
 
     # fit model of order (p, d, q)
-    # defaults:
+    # defaults to first order differencing to help with non-stationarity
     if not order:
         if deltat.total_seconds()>=15*60:
             # use MA process for time intervals 15 min or longer
             p = 0
             d = 1
             q = 1
+            start_params = [1, 0]
         else:
-            # use AR process
+            # use AR process for time intervals < 15 min
             p = 1
             d = 1
             q = 0
+            start_params = [0, 1]
         order = (p, d, q)
 
     model = sm.tsa.statespace.SARIMAX(fitdata,
                                       trend='n',
                                       order=order)
-    results = model.fit()
 
+    # if not provided, generate guess of model parameters, helps overcome 
+    # non-stationarity
+    if not start_params:
+        # generate a list with one entry '0' for each AR or MA parameter 
+        # plus an entry '1' for the variance parameter
+        start_params = []
+        for i in range(0, order[0]+order[2]):
+            start_params.append(0)
+        start_params.append(1)
+
+    # generate the ARMA model object
+    results = model.fit(start_params=start_params)
+
+    # total intervals to forecast from end of data to end of forecast
+    idr = pd.DatetimeIndex(start=fitdata.index[-1],
+                           end=end,
+                           freq=pd.to_timedelta(deltat))
+
+    f_intervals = len(idr) - 1 # first time in idr is last data point
+
+    # forecast
     f = results.forecast(f_intervals)
 
-    # create datetime index for forecast
-    fdr = pd.DatetimeIndex(start=start, end=end, freq=pd.to_timedelta(deltat))
+    # return the requested forecast times
+    f = f[fdr]
+    # limit forecast to 0.0 and clear-sky power
+    # get clear-sky power at time of year
+    cspower = get_clearsky_power(pvobj, fdr)
+    f[f > cspower] = cspower
+    f[f < 0] = 0.0
+    sr, ss = get_sr_ss(pvobj, end)
+    f[f.index < sr] = 0.0
+    f[f.index > ss] = 0.0
 
     return f[fdr]
+
 
 
 if __name__ == "__main__":
@@ -733,7 +836,12 @@ if __name__ == "__main__":
                                         tz=USMtn,
                                         tilt=35,
                                         azimuth=180,
-                                        forecast_method='persistence')
+                                        tracking=True,
+                                        max_angle=90,
+                                        backtrack=True,
+                                        gcr=2.0/7.0,
+                                        forecast_method='arma',
+                                        sunrise='yesterday')
 
         from dateutil import parser
         timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)
@@ -742,17 +850,18 @@ if __name__ == "__main__":
                                  '2018-02-18T16:30:00',
                                  '2018-02-18T16:45:00']]
         values = [300.0, 400.1, 500.2, 600.3]
-        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps))
+        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps),
+                            dtype=np.float)
         start = parser.parse('2018-02-18T17:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
         end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
 
         fc = pvdict['sunpower'].forecast(start=start,
-                                                end=end,
-                                                history=history,
-                                                deltat=timedelta(minutes=15),
-                                                dataWindowLength=timedelta(hours=1))
+                                         end=end,
+                                         history=history,
+                                         deltat=timedelta(minutes=15),
+                                         dataWindowLength=timedelta(hours=1))
 
-#        print(fc)
+        print(fc)
 #
 #        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
 #                              end='2018-02-20 00:00:00',

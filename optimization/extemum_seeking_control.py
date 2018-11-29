@@ -141,7 +141,7 @@ def set_reactive_power(nameplate_va=None, p_lim=None, p_now=None, va_now=None, u
 
     # Special case: reactive power target is larger than the VA limit of DER
     # Set u (var_targ) to nameplate VA
-    if math.fabs(var_targ) > va_now:
+    if math.fabs(var_targ) > nameplate_va:
         if var_targ < 0:
             var_targ = -nameplate_va
         else:
@@ -432,4 +432,3 @@ if __name__ == "__main__":
     plt.title('Power Factor settings for DER')
 
     plt.show()
-

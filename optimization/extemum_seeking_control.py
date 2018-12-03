@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 
 
 # ES function - gets called every timestep
-def es_function(t, T, hpf, lpf, f, c, a_param, Jk, Jkm1, sigmakm1, psikm1, gammakm1, uhatkm1):
+def es_function(t, T, hpf, lpf, f, c, a_param, Jk, Jkm1, sigmakm1, psikm1, gammakm1, uhatkm1, uhatk_lim=None):
     """
     ES control minimizing a quadratic function
     Dan Arnold, dbarnold@lbl.gov
@@ -76,6 +76,11 @@ def es_function(t, T, hpf, lpf, f, c, a_param, Jk, Jkm1, sigmakm1, psikm1, gamma
 
     # pass the resulting signal through an integrator
     uhatk = uhatkm1 + c*T/2*(gammak + gammakm1)
+    if uhatk_lim is not None:
+        if uhatk > uhatk_lim:
+            uhatk = uhatk_lim
+        if uhatk < -uhatk_lim:
+            uhatk = -uhatk_lim
 
     # modulation - add the perturbation to the next control setpoint
     uk = (uhatk + a_param*np.cos(w*t))
@@ -167,6 +172,7 @@ def set_reactive_power(nameplate_va=None, p_lim=None, p_now=None, va_now=None, u
             pf_targ = p_lim/va_on_p_lim
     # print('var_targ = %s, p_targ = %s, pf_targ = %s' % (var_targ, w_targ, pf_targ))
 
+    # Note: if uhatk_lim is used correctly, these saturation limits will not be used
     if math.fabs(pf_targ) < math.fabs(pf_lim):  # check on PF limits
         # At PF limits
         if pf_targ > 0:
@@ -323,6 +329,14 @@ if __name__ == "__main__":
     # Enter or read the Power Factor limits from the DER devices
     pf_lim = [0.8, 0.85, 0.85]
 
+    # cap the reactive power request at the power factor limit minus the probing signal amplitude.
+    # This allows the gradient to still be calculated without saturating the DER.
+    uhatk_lim = []
+    for i in range(len(pf_lim)):
+        u_max_pu = math.sqrt(1 - pf_lim[i]**2)
+        uhatk_lim.append(u_max_pu*va_lim[i] - a[i])
+    print(uhatk_lim)
+
     v_nom = 240.  # nominal grid voltage
 
     print("Entering control loop...")
@@ -355,7 +369,7 @@ if __name__ == "__main__":
             for n in range(n_der):
                 uk[n], sigmak[n], psik[n], gammak[n], uhatk[n] = \
                     es_function(time_vector[i], T, hpf, lpf, f[n], c[n], a[n], J[i],
-                                J[i-1], sigma[i-1][n], psi[i-1][n], gamma[i-1][n], uhat[i-1][n])
+                                J[i-1], sigma[i-1][n], psi[i-1][n], gamma[i-1][n], uhat[i-1][n], uhatk_lim[n])
 
                 # Measure/read the power, apparent power, and PF limits of the DERs
                 if n == 0:

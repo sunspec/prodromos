@@ -47,6 +47,8 @@ def es_function(t, T, hpf, lpf, f, c, a_param, Jk, Jkm1, sigmakm1, psikm1, gamma
     psikm1: signal after demodulation at last timestep
     gammakm1: output of lowpass filter
     uhatkm1: output of integrator at last timestep
+    uhatk_lim: saturation on uhatk. This can be used to cap the u values at a limit such that we ensure that the output
+    of the controller (uhat) plus the perturbation (a*cos(wt)) is never clipped by the hardware.
 
     outputs:
     uk: the control to be applied at the next timestep

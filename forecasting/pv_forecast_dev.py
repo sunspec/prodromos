@@ -361,7 +361,7 @@ def _get_data_for_persistence(start, history, dataWindowLength):
 
     # find last time to include. Earliest of either forecast start or the last
     # time in history
-    end_data_time = min([max(history.index), start])
+    end_data_time = min([history.index[-1], start])
     # select data within dataWindowLength
     fitdata = history.loc[(history.index>=end_data_time - dataWindowLength) &
                          (history.index<=end_data_time)]
@@ -474,7 +474,7 @@ def forecast_persistence(pvobj, start, end, history, deltat,
         cspower = get_clearsky_power(pvobj, fitdata.index)
         
         # compute average clear sky power index
-        cspower_index = calc_ratio(fitdata, cspower['ac_power'])
+        cspower_index = calc_clear_index(fitdata, cspower['ac_power'])
     
         fcst_cspower = get_clearsky_power(pvobj, dr)
     
@@ -578,8 +578,9 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
 
     # trim to start at first index in idr (in phase with forecast start),
     # and don't overrun history
-    idata = newdata[(newdata.index>=min(idr)) &
-                    (newdata.index<=max(history.index))].copy()
+    idata = newdata[(newdata.index>=idr[0]) &
+                    (newdata.index<=idr[-1]) &
+                    (newdata.index<=history.index[-1])].copy()
 
     # calculates minutes out of phase with midnight
     base = int((idr[0].replace(hour=0, second=0) -
@@ -635,7 +636,7 @@ def _get_data_for_ARMA_forecast(start, end, deltat, history,
     idata, idr = _align_data_to_forecast(start, end, deltat, history)
 
     # select aligned data within dataWindowLength
-    end_data_time = max(idata.index)
+    end_data_time = idata.index[-1]
     first_data_time = end_data_time - dataWindowLength
     fitdata = idata.loc[(idata.index>=first_data_time) &
                         (idata.index<=end_data_time)]
@@ -643,13 +644,14 @@ def _get_data_for_ARMA_forecast(start, end, deltat, history,
     # determine number of intervals for forecast. start with first interval
     # after the data used to fit the model. +1 because steps counts intervals
     # we want the interval after the last entry in fdr
-    f_intervals = len(idr[idr>max(fitdata.index)]) + 1
+    f_intervals = len(idr[idr>fitdata.index[-1]]) + 1
 
     return fitdata, f_intervals
 
 
 def forecast_ARMA(pvobj, start, end, history, deltat,
-                  dataWindowLength=timedelta(hours=1), order=None):
+                  dataWindowLength=timedelta(hours=1), order=None,
+                  start_params=None):
 
     """
     Generate forecast from start to end at time resolution deltat
@@ -672,17 +674,21 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
     history : pandas Series
         historical values of AC power from which the forecast is made.
 
+    dataWindowLenth : timedelta, default one hour
+
     order : tuple of three integers
         autoregressive, difference, and moving average orders for an ARMA
         forecast model
 
-    dataWindowLenth : timedelta, default one hour
-
+    start_params : list of float
+        initial guess of model parameters, one value for each autoregressive
+        and moving average coefficient, followed by the value for the variance
+        term
     """
 
     # TODO: input validation
 
-    fitdata, f_intervals = _get_data_for_ARMA_forecast(pvobj, start, end,
+    fitdata, f_intervals = _get_data_for_ARMA_forecast(start, end,
                                                        deltat, history,
                                                        dataWindowLength)
 
@@ -706,7 +712,20 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
     model = sm.tsa.statespace.SARIMAX(fitdata,
                                       trend='n',
                                       order=order)
-    results = model.fit()
+    # if not provided, generate guess of model parameters, helps overcome
+    # non-stationarity
+
+    if not start_params:
+        # generate a list with one entry '0' for each AR or MA parameter
+        # plus an entry '1' for the variance parameter
+        start_params = []
+        for i in range(0, order[0]+order[2]):
+            start_params.append(0)
+        start_params.append(1)
+
+    # generate the ARMA model object
+
+    results = model.fit(start_params=start_params)
 
     f = results.forecast(f_intervals)
 
@@ -753,7 +772,7 @@ if __name__ == "__main__":
                                                 deltat=timedelta(minutes=15),
                                                 dataWindowLength=timedelta(hours=1))
 
-#        print(fc)
+        print(fc)
 #
 #        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
 #                              end='2018-02-20 00:00:00',

@@ -288,6 +288,9 @@ if __name__ == "__main__":
     n_der = 3  # Number of DER
     n_v_meas_points = 3  # Number of voltage measurement points
 
+    # Enter the nominal voltages for each of the feeder measurements
+    v_nom = [240., 240., 240.]  # nominal grid voltage
+
     # initial conditions
     sigma = []*n_der  # value after highpass (washout) filter
     psi = []*n_der  # value after demodulation
@@ -331,15 +334,37 @@ if __name__ == "__main__":
     # Enter or read the Power Factor limits from the DER devices
     pf_lim = [0.8, 0.85, 0.85]
 
-    # cap the reactive power request at the power factor limit minus the probing signal amplitude.
-    # This allows the gradient to still be calculated without saturating the DER.
-    uhatk_lim = []
-    for i in range(len(pf_lim)):
-        u_max_pu = math.sqrt(1 - pf_lim[i]**2)
-        uhatk_lim.append(u_max_pu*va_lim[i] - a[i])
-    print(uhatk_lim)
+    # Set the PFs to unity
+    for i in range(n_der):
+        pf_targ = 1
+        # pf_targ ---> DERn
 
-    v_nom = 240.  # nominal grid voltage
+    time.sleep(1)
+
+    # Cap the reactive power request at the power factor limit minus the probing signal amplitude.
+    # This allows the gradient to still be calculated without saturating the DER.
+    uhatk_lim = [-1., -1., -1.]
+
+    # Do not begin the ESC controller until all the DER devices can create the probing signal
+    while not all(probe_range >= 0 for probe_range in uhatk_lim):
+        # Measure/read the power of the DERs
+        for n in range(n_der):
+            if n == 0:
+                p_now = 258.e3   # ^^^^ Add DER power read command here!
+            elif n == 1:
+                p_now = 1.e7     # ^^^^ Add DER power read command here!
+            else:
+                p_now = 1.e6     # ^^^^ Add DER power read command here!
+
+            # a_avail is the available probing magnitude in var
+            # This code assumes fixed power factor limits. Some devices may have larger PF limits at low irradiance.
+            a_avail = p_now * math.tan(math.acos(pf_lim[n]))
+
+            # uhatk_lim is the reactive power limit minus probing signal mag
+            uhatk_lim[n] = a_avail - a[n]
+
+        print('Current probing signal ranges: %s. All must be positive to begin the ESC program.' % uhatk_lim)
+        time.sleep(1)
 
     print("Entering control loop...")
     for i in range(simulation_steps):
@@ -356,7 +381,7 @@ if __name__ == "__main__":
             for j in range(n_v_meas_points):
                 v_measurement.append(240.)  # imaginary voltage measurement  ^^^^ Add voltage measurements here!
                 # objective function is the summation of the square voltage error
-                J[i] += (v_measurement[j]-v_nom)**2
+                J[i] += (v_measurement[j]-v_nom[j])**2
 
             # ts.log_debug('ES Control for SW inverters')
             uk = [None]*n_der       # u's for step k
@@ -369,6 +394,8 @@ if __name__ == "__main__":
             w_targ = [0.0]*n_der    # active power that will provide the reactive power target
 
             for n in range(n_der):
+
+                # We want the controller to update
                 uk[n], sigmak[n], psik[n], gammak[n], uhatk[n] = \
                     es_function(time_vector[i], T, hpf, lpf, f[n], c[n], a[n], J[i],
                                 J[i-1], sigma[i-1][n], psi[i-1][n], gamma[i-1][n], uhat[i-1][n], uhatk_lim[n])
@@ -388,8 +415,20 @@ if __name__ == "__main__":
                     set_reactive_power(nameplate_va=va_lim[n], p_lim=known_p_lim[n], p_now=p_now, va_now=va_now,
                                        u=uk[n], pf_lim=pf_lim[n], der_type='SunSpec')
 
-                # Send the new PF setpoint to the DER ^^^^ Add DER write commands here!
-                # pf_targ ---> DERn
+                # Update the uhatk_limits based on the maximum DER power (as PV irradiance changes)
+                a_avail = known_p_lim[n] * math.tan(math.acos(pf_lim[n]))
+                if a_avail < a[n]:
+                    # If the probing signal is larger than the available range of reactive power, reset the ESC
+                    pf_targ = 1.0
+                    print('The probing signal cannot be created for DER %i, restarting the ESC controller.' % (n+1))
+                    # ^^^^ pf_targ ---> all DERs
+                    # Restart ESC code!
+                    break
+                else:
+                    # If the probing signal sinusoid can be created from available DER reactive power, update uhatk_lim
+                    uhatk_lim[n] = a_avail - a[n]
+                    # Send the new PF setpoint to the DER ^^^^ Add DER write commands here!
+                    # pf_targ ---> DERn
 
             # store values for next timestep
             u.append(uk)   # Note that uk is the same at var_targ

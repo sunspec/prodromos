@@ -284,7 +284,6 @@ def simple_es_demo(plot=True):
 if __name__ == "__main__":
 
     # Setup example demonstration for ES Control of DER
-    simulation_steps = 60
     n_der = 3  # Number of DER
     n_v_meas_points = 3  # Number of voltage measurement points
 
@@ -334,120 +333,118 @@ if __name__ == "__main__":
     # Enter or read the Power Factor limits from the DER devices
     pf_lim = [0.8, 0.85, 0.85]
 
-    # Set the PFs to unity
-    for i in range(n_der):
-        pf_targ = 1
-        # pf_targ ---> DERn
+    restart_count = 0
+    while True:  # Continuous control loop, restarted when u_lim drops below any 'a' parameter
+        print("Entering control loop for the %i time." % restart_count)
 
-    time.sleep(1)
+        # Set the PFs to unity
+        for i in range(n_der):
+            pf_targ = 1
+            # pf_targ ---> DERn
 
-    # Cap the reactive power request at the power factor limit minus the probing signal amplitude.
-    # This allows the gradient to still be calculated without saturating the DER.
-    uhatk_lim = [-1., -1., -1.]
+        time.sleep(1)  # Allow DER devices time to update their power measurements after changing power factors
 
-    # Do not begin the ESC controller until all the DER devices can create the probing signal
-    while not all(probe_range >= 0 for probe_range in uhatk_lim):
-        # Measure/read the power of the DERs
-        for n in range(n_der):
-            if n == 0:
-                p_now = 258.e3   # ^^^^ Add DER power read command here!
-            elif n == 1:
-                p_now = 1.e7     # ^^^^ Add DER power read command here!
-            else:
-                p_now = 1.e6     # ^^^^ Add DER power read command here!
-
-            # a_avail is the available probing magnitude in var
-            # This code assumes fixed power factor limits. Some devices may have larger PF limits at low irradiance.
-            a_avail = p_now * math.tan(math.acos(pf_lim[n]))
-
-            # uhatk_lim is the reactive power limit minus probing signal mag
-            uhatk_lim[n] = a_avail - a[n]
-
-        print('Current probing signal ranges: %s. All must be positive to begin the ESC program.' % uhatk_lim)
-        time.sleep(1)
-
-    print("Entering control loop...")
-    for i in range(simulation_steps):
-        loop_start_time = time.time()-start_time
-        time_vector.append(loop_start_time)
-
-        # Don't do anything the first timestep
-        if i >= 1:
-            T = time_vector[-1]-time_vector[-2]  # Time step
-
-            # Measure the voltage from DER and/or other power meters
-            v_measurement = []
-            J.append(0)  # initialize objective function at 0 for this time step
-            for j in range(n_v_meas_points):
-                v_measurement.append(240.)  # imaginary voltage measurement  ^^^^ Add voltage measurements here!
-                # objective function is the summation of the square voltage error
-                J[i] += (v_measurement[j]-v_nom[j])**2
-
-            # ts.log_debug('ES Control for SW inverters')
-            uk = [None]*n_der       # u's for step k
-            sigmak = [None]*n_der   # sigma's for step k
-            psik = [None]*n_der     # sigma's for step k
-            gammak = [None]*n_der   # gamma's for step k
-            uhatk = [None]*n_der    # uhat's for step k
-            var_targ = [0.0]*n_der  # target reactive power for the DERs
-            pf_targ = [0.0]*n_der   # power factor to deliver the target reactive power
-            w_targ = [0.0]*n_der    # active power that will provide the reactive power target
-
+        # Do not begin the ESC controller until all the DER devices can create the probing signal
+        uhatk_lim = [-1., -1., -1.]  # Initialize limits below 0.  They must be >= 0 to proceed into the ESC loop
+        while not all(probe_range >= 0 for probe_range in uhatk_lim):
+            # Measure/read the power of the DERs
             for n in range(n_der):
-
-                # We want the controller to update
-                uk[n], sigmak[n], psik[n], gammak[n], uhatk[n] = \
-                    es_function(time_vector[i], T, hpf, lpf, f[n], c[n], a[n], J[i],
-                                J[i-1], sigma[i-1][n], psi[i-1][n], gamma[i-1][n], uhat[i-1][n], uhatk_lim[n])
-
-                # Measure/read the power, apparent power, and PF limits of the DERs
                 if n == 0:
                     p_now = 258.e3   # ^^^^ Add DER power read command here!
-                    va_now = 258.e3  # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
                 elif n == 1:
                     p_now = 1.e7     # ^^^^ Add DER power read command here!
-                    va_now = 1.e7    # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
                 else:
                     p_now = 1.e6     # ^^^^ Add DER power read command here!
-                    va_now = 1.e6    # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
 
-                var_targ[n], pf_targ[n], w_targ[n], known_p_lim[n] = \
-                    set_reactive_power(nameplate_va=va_lim[n], p_lim=known_p_lim[n], p_now=p_now, va_now=va_now,
-                                       u=uk[n], pf_lim=pf_lim[n], der_type='SunSpec')
+                # a_avail is the available probing magnitude in var
+                # This code assumes fixed power factor limits. Some devices may have larger PF limits at low irradiance.
+                a_avail = p_now * math.tan(math.acos(pf_lim[n]))
+                uhatk_lim[n] = a_avail - a[n]  # uhatk_lim is the reactive power limit minus probing signal mag
 
-                # Update the uhatk_limits based on the maximum DER power (as PV irradiance changes)
-                a_avail = known_p_lim[n] * math.tan(math.acos(pf_lim[n]))
-                if a_avail < a[n]:
-                    # If the probing signal is larger than the available range of reactive power, reset the ESC
-                    pf_targ = 1.0
-                    print('The probing signal cannot be created for DER %i, restarting the ESC controller.' % (n+1))
-                    # ^^^^ pf_targ ---> all DERs
-                    # Restart ESC code!
-                    break
-                else:
-                    # If the probing signal sinusoid can be created from available DER reactive power, update uhatk_lim
-                    uhatk_lim[n] = a_avail - a[n]
-                    # Send the new PF setpoint to the DER ^^^^ Add DER write commands here!
-                    # pf_targ ---> DERn
+            print('Current probing signal ranges: %s. All must be positive to begin the ESC program.' % uhatk_lim)
+            time.sleep(1)
 
-            # store values for next timestep
-            u.append(uk)   # Note that uk is the same at var_targ
-            sigma.append(sigmak)
-            psi.append(psik)
-            gamma.append(gammak)
-            uhat.append(uhatk)
-            pf_history.append(pf_targ)
+        # ESC control loop
+        while True:
+            loop_start_time = time.time()-start_time
+            time_vector.append(loop_start_time)
 
-            # Check on the loop time.
-            elapsed_time = time.time()-start_time
+            # Don't do anything the first timestep
+            i = len(time_vector)-1
+            if i >= 1:
+                T = time_vector[-1]-time_vector[-2]  # Time step
 
-            print('Time: %0.2f, J_new = %0.3f, Set DER#1 PF = %0.3f (var = %0.3f), '
-                  'Set DER#2 PF = %0.3f (var = %0.3f, Set DER#3 PF = %0.3f (var = %0.3f)' %
-                  (elapsed_time, J[i], pf_targ[0], var_targ[0], pf_targ[1], var_targ[1], pf_targ[2], var_targ[2]))
+                # Measure the voltage from DER and/or other power meters
+                v_measurement = []
+                J.append(0)  # initialize objective function at 0 for this time step
+                for j in range(n_v_meas_points):
+                    v_measurement.append(240.)  # imaginary voltage measurement  ^^^^ Add voltage measurements here!
+                    # objective function is the summation of the square voltage error
+                    J[i] += (v_measurement[j]-v_nom[j])**2
 
-            loop_time = elapsed_time - loop_start_time
-            if loop_time < max_comm_rate:  # don't exceed 5 Hz update speed (DER limit)
-                time.sleep(max_comm_rate-loop_time)
+                # ts.log_debug('ES Control for SW inverters')
+                uk = [None]*n_der       # u's for step k
+                sigmak = [None]*n_der   # sigma's for step k
+                psik = [None]*n_der     # sigma's for step k
+                gammak = [None]*n_der   # gamma's for step k
+                uhatk = [None]*n_der    # uhat's for step k
+                var_targ = [0.0]*n_der  # target reactive power for the DERs
+                pf_targ = [0.0]*n_der   # power factor to deliver the target reactive power
+                w_targ = [0.0]*n_der    # active power that will provide the reactive power target
+
+                for n in range(n_der):
+                    # Controller update
+                    uk[n], sigmak[n], psik[n], gammak[n], uhatk[n] = \
+                        es_function(time_vector[i], T, hpf, lpf, f[n], c[n], a[n], J[i],
+                                    J[i-1], sigma[i-1][n], psi[i-1][n], gamma[i-1][n], uhat[i-1][n], uhatk_lim[n])
+
+                    # Measure/read the power, apparent power, and PF limits of the DERs
+                    if n == 0:
+                        p_now = 258.e3   # ^^^^ Add DER power read command here!
+                        va_now = 258.e3  # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
+                    elif n == 1:
+                        p_now = 1.e7     # ^^^^ Add DER power read command here!
+                        va_now = 1.e7    # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
+                    else:
+                        p_now = 1.e6     # ^^^^ Add DER power read command here!
+                        va_now = 1.e6    # ^^^^ Add DER VA read command here! (Or read Q and calculate VA)
+
+                    var_targ[n], pf_targ[n], w_targ[n], known_p_lim[n] = \
+                        set_reactive_power(nameplate_va=va_lim[n], p_lim=known_p_lim[n], p_now=p_now, va_now=va_now,
+                                           u=uk[n], pf_lim=pf_lim[n], der_type='SunSpec')
+
+                    # Update the uhatk_limits based on the maximum DER power (as PV irradiance changes)
+                    a_avail = known_p_lim[n] * math.tan(math.acos(pf_lim[n]))
+                    if a_avail < a[n]:
+                        # If the probing signal is larger than the available range of reactive power, reset the ESC
+                        print('The probing signal cannot be created for DER %i, restarting the ESC controller.' % (n+1))
+                        break  # Restart ESC code!
+                    else:
+                        # If the probing signal sinusoid can be created from available DER Q, update uhatk_lim
+                        # Cap the reactive power request at the power factor limit minus the probing signal amplitude.
+                        # This allows the gradient to still be calculated without saturating the DER.
+                        uhatk_lim[n] = a_avail - a[n]
+                        # Send the new PF setpoint to the DER ^^^^ Add DER write commands here!
+                        # pf_targ ---> DERn
+
+                # store values for next timestep
+                u.append(uk)   # Note that uk is the same at var_targ
+                sigma.append(sigmak)
+                psi.append(psik)
+                gamma.append(gammak)
+                uhat.append(uhatk)
+                pf_history.append(pf_targ)
+
+                # Check on the loop time.
+                elapsed_time = time.time()-start_time
+
+                print('Time: %0.2f, J_new = %0.3f, Set DER#1 PF = %0.3f (var = %0.3f), '
+                      'Set DER#2 PF = %0.3f (var = %0.3f, Set DER#3 PF = %0.3f (var = %0.3f)' %
+                      (elapsed_time, J[i], pf_targ[0], var_targ[0], pf_targ[1], var_targ[1], pf_targ[2], var_targ[2]))
+
+                loop_time = elapsed_time - loop_start_time
+                if loop_time < max_comm_rate:  # don't exceed DER update limit
+                    time.sleep(max_comm_rate-loop_time)
 
     print("program complete")
 

@@ -366,6 +366,7 @@ if __name__ == "__main__":
 
         # ESC control loop
         while True:
+            restart_esc = False
             loop_start_time = time.time()-start_time
             time_vector.append(loop_start_time)
 
@@ -418,7 +419,7 @@ if __name__ == "__main__":
                     if a_avail < a[n]:
                         # If the probing signal is larger than the available range of reactive power, reset the ESC
                         print('The probing signal cannot be created for DER %i, restarting the ESC controller.' % (n+1))
-                        break  # Restart ESC code!
+                        restart_esc = True
                     else:
                         # If the probing signal sinusoid can be created from available DER Q, update uhatk_lim
                         # Cap the reactive power request at the power factor limit minus the probing signal amplitude.
@@ -445,6 +446,10 @@ if __name__ == "__main__":
                 loop_time = elapsed_time - loop_start_time
                 if loop_time < max_comm_rate:  # don't exceed DER update limit
                     time.sleep(max_comm_rate-loop_time)
+
+                # restart code after collecting all the timestep ESC parameters.
+                if restart_esc:
+                    break  # Restart ESC code!
 
     print("program complete")
 

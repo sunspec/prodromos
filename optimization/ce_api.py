@@ -88,7 +88,7 @@ class CE_API(object):
             resp = requests.get(url, params=payload, auth=auth, proxies=proxy, headers=headers, verify=False)
             self.der[der_id]['forecast'] = resp.content  # add the forecast to the der dict
 
-        return der
+        return self.der
 
 if __name__ == "__main__":
 

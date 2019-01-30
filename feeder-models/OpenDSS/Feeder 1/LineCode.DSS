@@ -1,0 +1,26 @@
+New "LineCode.busbar_phs3" nphases=3 baseFreq=60 r1=0.0222 x1=0.1103 r0=0.1059 x0=0.3995 C1=0 C0=0 normamps=600 emergamps=600 units=kft
+New "LineCode.busbar_phs1" nphases=1 baseFreq=60 r1=0.0222 x1=0.1103 r0=0.1059 x0=0.3995 C1=0 C0=0 normamps=600 emergamps=600 units=kft
+New "LineCode.1/0_al_ug_phs1" nphases=1 baseFreq=60 r1=0.1926 x1=0.0748 r0=0.4958 x0=0.2321 C1=16.936 C0=16.936 normamps=135 emergamps=135 units=kft
+New "LineCode.1/0_al_ug_phs3" nphases=3 baseFreq=60 r1=0.1926 x1=0.0748 r0=0.4958 x0=0.2321 C1=16.936 C0=16.936 normamps=135 emergamps=135 units=kft
+New "LineCode.2_al_ug_phs1" nphases=1 baseFreq=60 r1=0.3016 x1=0.0812 r0=0.6052 x0=0.2364 C1=14.439 C0=14.439 normamps=105 emergamps=105 units=kft
+New "LineCode.750_al_ug_phs3" nphases=3 baseFreq=60 r1=0.032 x1=0.0362 r0=0.0996 x0=0.0257 C1=34.176 C0=34.176 normamps=400 emergamps=600 units=kft
+New "LineCode.394_aaac_phs3" nphases=3 baseFreq=60 r1=0.0561 x1=0.1212 r0=0.1388 x0=0.4096 C1=0 C0=0 normamps=550 emergamps=550 units=kft
+New "LineCode.2_cu_ug_phs1" nphases=1 baseFreq=60 r1=0.1878 x1=0.0812 r0=0.4913 x0=0.2364 C1=14.439 C0=14.439 units=kft
+New "LineCode.397_aac_phs3" nphases=3 baseFreq=60 r1=0.0446 x1=0.1212 r0=0.1281 x0=0.4096 C1=0 C0=0 normamps=530 emergamps=590 units=kft
+New "LineCode.4_acsr_phs1" nphases=1 baseFreq=60 r1=0.4228 x1=0.1583 r0=0.5344 x0=0.4882 C1=0 C0=0 units=kft
+New "LineCode.2_al_ug_phs3" nphases=3 baseFreq=60 r1=0.3016 x1=0.0812 r0=0.6052 x0=0.2364 C1=14.439 C0=14.439 units=kft
+New "LineCode.2_acsr_phs3" nphases=3 baseFreq=60 r1=0.2661 x1=0.1601 r0=0.3778 x0=0.4901 C1=0 C0=0 normamps=190 emergamps=190 units=kft
+New "LineCode.2_acsr_phs2" nphases=2 baseFreq=60 r1=0.2661 x1=0.1601 r0=0.3778 x0=0.4901 C1=0 C0=0 normamps=190 emergamps=190 units=kft
+New "LineCode.2_acsr_phs1" nphases=1 baseFreq=60 r1=0.2661 x1=0.1601 r0=0.3778 x0=0.4901 C1=0 C0=0 normamps=190 emergamps=190 units=kft
+New "LineCode.2/0_acsr_phs1" nphases=1 baseFreq=60 r1=0.1333 x1=0.1556 r0=0.2449 x0=0.4855 C1=0 C0=0 normamps=280 emergamps=280 units=kft
+New "LineCode.2/0_acsr_phs3" nphases=3 baseFreq=60 r1=0.1333 x1=0.1556 r0=0.2449 x0=0.4855 C1=0 C0=0 normamps=280 emergamps=280 units=kft
+New "LineCode.4/0_al_ug_phs3" nphases=3 baseFreq=60 r1=0.1011 x1=0.066 r0=0.3115 x0=0.1043 C1=21.566 C0=21.566 units=kft
+New "LineCode.2_cu_ug_phs3" nphases=3 baseFreq=60 r1=0.1878 x1=0.0812 r0=0.4913 x0=0.2364 C1=14.439 C0=14.439 units=kft
+New "LineCode.3_cu_phs3" nphases=3 baseFreq=60 r1=0.2058 x1=0.1469 r0=0.3233 x0=0.5117 C1=0 C0=0 units=kft
+New "LineCode.6_cu_phs1" nphases=1 baseFreq=60 r1=0.4115 x1=0.1548 r0=0.5291 x0=0.5197 C1=0 C0=0 normamps=90 emergamps=110 units=kft
+New "LineCode.750_cu_ug_phs3" nphases=3 baseFreq=60 r1=0.0245 x1=0.0342 r0=0.0611 x0=0.0202 C1=34.176 C0=34.176 normamps=520 emergamps=850 units=kft
+New "LineCode.795_aac_phs3" r1=0.0227 x1=0.1129 r0=0.1062 x0=0.4013 C1=0 C0=0 normamps=550 emergamps=600 units=kft
+New "LineCode.477_acsr_phs3" r1=0.037 x1=0.1158 r0=0.311 x0=0.3988 C1=0 C0=0 normamps=550 emergamps=600 units=kft
+New "LineCode.4_cu_phs1" r1=0.2594 x1=0.1496 r0=0.3769 x0=0.5144 C1=0 C0=0 normamps=120 emergamps=150 units=kft
+New "LineCode.4_cu_phs3" r1=0.2594 x1=0.1496 r0=0.3769 x0=0.5144 C1=0 C0=0 normamps=120 emergamps=150 units=kft
+New "LineCode.397_aac_@_570/570_phs3" r1=0.0446 x1=0.1212 r0=0.1281 x0=0.4096 C1=0 C0=0 normamps=570 emergamps=570 units=kft

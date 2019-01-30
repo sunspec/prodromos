@@ -1,0 +1,3 @@
+New "RegControl.RegC1" transformer=Tran1 winding=2 tapwinding=2 vreg=120.000000 band=1.500000 ptratio=66.300000 CTprim=400.000000 R=6.000000 X=6.000000 delay=30
+New "RegControl.RegC2" transformer=Tran2 winding=2 tapwinding=2 vreg=120.000000 band=1.500000 ptratio=66.300000 CTprim=400.000000 R=6.000000 X=6.000000 delay=30
+New "RegControl.RegC3" transformer=Tran3 winding=2 tapwinding=2 vreg=120.000000 band=1.500000 ptratio=66.300000 CTprim=400.000000 R=6.000000 X=6.000000 delay=30

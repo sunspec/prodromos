@@ -1,0 +1,25 @@
+New "Capacitor.Capa1" phases=3 kvar=[ 600] kv=13.8044449363 bus1=b_6.1.2.3 bus2=b_6.0.0.0
+!Time controlled with volt override delay=90 delayoff=90 type=time ON=6.5 OFF=23.5 VoltOverride=true Vmax=126 Vmin=116
+
+New "Capacitor.Capa2" phases=3 kvar=[ 600] kv=13.8044449363 bus1=b_2.1.2.3 bus2=b_2.0.0.0
+!Time controlled with volt override delay=90 delayoff=90 type=time ON=7.00 OFF=23.00 VoltOverride=true Vmax=126 Vmin=116
+
+New "Capacitor.Capa3" phases=3 kvar=[ 900] kv=13.8044449363 bus1=b_5.1.2.3 bus2=b_5.0.0.0
+
+New "Capacitor.Capa4" phases=3 kvar=[ 1200] kv=13.8044449363 bus1=b_7.1.2.3 bus2=b_7.0.0.0
+!May 15 - Sept 15: Temperature controlled with volt override (open at 80F and close at 85F) - No temperature control in OpenDSS
+!delay=90 delayoff=90 type=time ON=7.5 OFF=22.50 VoltOverride=true Vmax=126 Vmin=116
+!Sept 16 - May 14: Voltage Controlled
+!delay=90 delayoff=90 type=voltage ON=116 OFF=122
+
+New "Capacitor.Capa5" phases=3 kvar=[ 600] kv=13.8044449363 bus1=b_12.1.2.3 bus2=b_12.0.0.0
+!May 15 - Sept 15: Time controlled with volt override
+!delay=90 delayoff=90 type=time ON=7.5 OFF=22.50 VoltOverride=true Vmax=126 Vmin=116
+!Sept 16 - May 14: Voltage Controlled
+!delay=90 delayoff=90 type=voltage ON=116 OFF=122
+
+New "Capacitor.Capa6" phases=3 kvar=[ 600] kv=13.8044449363 bus1=b_13.1.2.3 bus2=b_13.0.0.0
+!May 15 - Sept 15: Time controlled with volt override
+!delay=90 delayoff=90 type=time ON=8.00 OFF=22.00 VoltOverride=true Vmax=126 Vmin=116
+!Sept 16 - May 14: Voltage Controlled
+!delay=90 delayoff=90 type=voltage ON=116 OFF=122

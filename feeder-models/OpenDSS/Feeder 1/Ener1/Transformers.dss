@@ -1,0 +1,1 @@
+New "Transformer.Tran20" phases=3 windings=2 buses=[b_10.1.2.3, b_15, ] kVs=[12.47, 0.48, ] kVAs=[500, 500, ] conns=[wye, wye, ] buses=[b_10.1.2.3, b_15, ] conns=[wye, wye, ] kVs=[12.47, 0.48, ] kVAs=[500, 500, ] taps=[1, 1, ] wdg=1 %R=0.2 wdg=2 %R=0.2

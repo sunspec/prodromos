@@ -1,0 +1,19 @@
+Clear
+New Circuit.NGfeeder bus1=b_1 basekv=13.8 pu=1.02 angle=0.000000 Z1=[0.0339, 1.0783] Z0=[0.0293, 1.0436]
+
+
+Redirect LineCode.DSS
+Redirect Lines.dss
+!Redirect Shunts.dss !The shunt reactors have been removed from this model because they do not impact the simulation much but add complexity
+Redirect Loads.dss
+Redirect Capacitors.dss
+Redirect Transformer.DSS
+Redirect RegControl.DSS
+Redirect PVSystem.DSS
+Redirect EnergyMeter.DSS
+MakeBusList
+Redirect BusVoltageBases.dss  ! set voltage bases
+calcv
+Buscoords buscoords.dss
+
+solve

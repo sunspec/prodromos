@@ -1,0 +1,51 @@
+New "LineCode.basic1" nphases=1 r1=0.001 r0=0.001 x1=0.001 x0=0.001 B1=0.001 B0=0.001 normamps=1 emergamps=1.25 units=mi
+New "LineCode.basic2" nphases=2 r1=0.001 r0=0.001 x1=0.001 x0=0.001 B1=0.001 B0=0.001 normamps=1 emergamps=1.25 units=mi
+New "LineCode.basic3" nphases=3 r1=0.001 r0=0.001 x1=0.001 x0=0.001 B1=0.001 B0=0.001 normamps=1 emergamps=1.25 units=mi
+New "LineCode.1a_1/0_aaac_1" nphases=1 r1=0.5518 r0=0.9193 x1=1.377 B1=3.5897 B0=1.8097 normamps=230.000000 units=km
+New "LineCode.1a_1/0_aac_1" nphases=1 r1=0.5499 r0=0.9175 x1=0.4698 x0=1.3071 B1=3.5421 B0=1.7976 normamps=242.000000 units=km
+New "LineCode.1a_1/0_acsr_1" nphases=1 r1=0.5518 r0=0.8879 x1=0.5397 x0=1.3946 B1=3.5897 B0=1.8134 normamps=230.000000 units=km
+New "LineCode.1a_1/0_al_1" nphases=1 r1=0.5499 r0=0.9175 x1=0.4698 x0=1.3071 B1=3.5421 B0=1.7976 normamps=242.000000 units=km
+New "LineCode.1a_1/0_cu_1" nphases=1 r1=0.3449 r0=0.6232 x1=0.4703 x0=1.2281 B1=3.5421 B0=1.7976 normamps=310.000000 units=km
+New "LineCode.1a_336_4_al_1" nphases=1 r1=0.1734 r0=0.25095 x1=0.4221 x0=1.277 B1=3.9371 B0=1.898 normamps=514.000000 units=km
+New "LineCode.1a_3_al_1" nphases=1 r1=1.0998 r0=1.4359 x1=0.4965 x0=1.3514 B1=3.3456 B0=1.749 normamps=155.000000 units=km
+New "LineCode.1a_3_cu_1" nphases=1 r1=0.691 r0=1.0271 x1=0.4965 x0=1.3514 B1=3.3456 B0=1.749 normamps=200.000000 units=km
+New "LineCode.1a_4/0_al_1" nphases=1 r1=0.2746 r0=0.6107 x1=0.4437 x0=1.2987 B1=3.7647 B0=1.857 normamps=380.000000 units=km
+New "LineCode.1a_477_aaac_1" nphases=1 r1=0.1347 r0=0.4838 x1=0.3956 x0=1.2605 B1=4.2152 B0=1.9583 normamps=645.000000 units=km
+New "LineCode.1p_1/0_aaac_1" nphases=1 r1=0.1033 r0=0.4524 x1=0.3931 x0=1.2581 B1=3.7021 B0=1.8398 normamps=255.000000 units=km
+New "LineCode.1p_1/0_al_1" nphases=1 r1=0.5499 r0=0.899 x1=0.4564 x0=1.3214 B1=3.6514 B0=1.8272 normamps=250.000000 units=km
+New "LineCode.1p_336_4_al_1" nphases=1 r1=0.1734 r0=0.5225 x1=0.4087 x0=12737 B1=4.0727 B0=1.9269 normamps=515.000000 units=km
+New "LineCode.1p_4/0_al_1" nphases=1 r1=0.2746 r0=0.6237 x1=0.4304 x0=1.2953 B1=3.8884 B0=1.8847 normamps=385.000000 units=km
+New "LineCode.1p_477_aaac_1" nphases=1 r1=0.1347 r0=0.4838 x1=0.3956 x0=1.2605 B1=4.2152 B0=1.9583 normamps=645.000000 units=km
+New "LineCode.2p_1/0_aaac_2" nphases=2 r1=0.10327 r0=0.44503 x1=0.42595 x0=1.2094 B1=3.4376 B0=1.9715 normamps=255.000000 units=km
+New "LineCode.2p_1/0_al_2" nphases=2 r1=0.54991 r0=0.89167 x1=0.48921 x0=1.2727 B1=3.3939 B0=1.957 normamps=250.000000 units=km
+New "LineCode.2p_3_aaac_2" nphases=2 r1=1.0998 r0=1.4415 x1=0.51561 x0=1.2991 B1=3.213 B0=1.8955 normamps=160.000000 units=km
+New "LineCode.2p_3_al_2" nphases=2 r1=1.0998 r0=1.4415 x1=0.51561 x0=1.2991 B1=3.213 B0=1.8955 normamps=160.000000 units=km
+New "LineCode.2p_3_cu_2" nphases=2 r1=0.69103 r0=1.0328 x1=0.51592 x0=1.2994 B1=3.213 B0=1.8955 normamps=205.000000 units=km
+New "LineCode.3a_336_4_aaac_3" nphases=3 r1=0.17274 r0=0.5176 x1=0.36773 x0=1.3315 B1=4.4851 B0=1.7738 normamps=530.000000 units=km
+New "LineCode.3a_336_4_aac_3" nphases=3 r1=0.17336 r0=0.51822 x1=0.3791 x0=1.3429 B1=4.4102 B0=1.762 normamps=514.000000 units=km
+New "LineCode.3a_336_4_al_3" nphases=3 r1=0.17336 r0=0.51822 x1=0.3791 x0=1.3429 B1=4.4102 B0=1.762 normamps=514.000000 units=km
+New "LineCode.3a_477_al_3" nphases=3 r1=0.074316 r0=0.47361 x1=0.36419 x0=1.7177 B1=4.7134 B0=1.7583 normamps=690.000000 units=km
+New "LineCode.3p_1/0_aaac_3" nphases=3 r1=0.53643 r0=0.9246 x1=0.4226 x0=1.538 B1=3.704 B0=1.8274 normamps=255.000000 units=km
+New "LineCode.3p_1/0_al_3" nphases=3 r1=0.54991 r0=0.89409 x1=0.45615 x0=1.3332 B1=3.6534 B0=1.815 normamps=250.000000 units=km
+New "LineCode.3p_1/0_cu_3" nphases=3 r1=0.33759 r0=0.72576 x1=0.4285 x0=1.544 B1=3.6534 B0=1.815 normamps=315.000000 units=km
+New "LineCode.3p_3/0_aaac_3" nphases=3 r1=0.34362 r0=0.6878 x1=0.503 x0=1.3799 B1=3.8626 B0=1.8652 normamps=340.000000 units=km
+New "LineCode.3p_336_4_aac_3" nphases=3 r1=0.17398 r0=0.63628 x1=0.40327 x0=1.2825 B1=4.0522 B0=1.9084 normamps=515.000000 units=km
+New "LineCode.3p_336_4_al_3" nphases=3 r1=0.17343 r0=0.5176 x1=0.40855 x0=1.2855 B1=4.0751 B0=1.9134 normamps=515.000000 units=km
+New "LineCode.3p_4/0_al_3" nphases=3 r1=0.27458 r0=0.61876 x1=0.43018 x0=1.3071 B1=3.8907 B0=1.8717 normamps=385.000000 units=km
+New "LineCode.3p_4/0_cu_3" nphases=3 r1=0.17268 r0=0.45745 x1=0.43024 x0=1.2063 B1=3.8907 B0=1.8677 normamps=440.000000 units=km
+New "LineCode.3p_477_aaac_3" nphases=3 r1=0.13471 r0=0.47889 x1=0.39532 x0=1.2723 B1=4.2177 B0=1.9443 normamps=645.000000 units=km
+New "LineCode.3p_477_aac_3" nphases=3 r1=0.12117 r0=0.58398 x1=0.39022 x0=1.2693 B1=4.2177 B0=1.9443 normamps=645.000000 units=km
+New "LineCode.3p_477_al_3" nphases=3 r1=0.13471 r0=0.47889 x1=0.39532 x0=1.2723 B1=4.2177 B0=1.9443 normamps=645.000000 units=km
+New "LineCode.3s_1/0_aaac_3" nphases=3 r1=0.54991 r0=1.0425 x1=0.3146 x0=1.2879 B1=5.432 B0=1.9355 normamps=210.000000 units=km
+New "LineCode.3s_336_4_aac_3" nphases=3 r1=0.16703 r0=0.56284 x1=0.33287 x0=1.4795 B1=6.4196 B0=2.0478 normamps=425.000000 units=km
+New "LineCode.3s_336_4_al_3" nphases=3 r1=0.17343 r0=0.66599 x1=0.267 x0=1.2403 B1=6.4196 B0=2.0478 normamps=425.000000 units=km
+New "LineCode.3s_477_aac_3" nphases=3 r1=0.11812 r0=0.5163 x1=0.3197 x0=1.4612 B1=6.4196 B0=2.0478 normamps=530.000000 units=km
+New "LineCode.3s_477_al_3" nphases=3 r1=0.11812 r0=0.5163 x1=0.3197 x0=1.4612 B1=6.4196 B0=2.0478 normamps=530.000000 units=km
+New "LineCode.1000_al_xlp_3" nphases=3 r1=0.071333 r0=1.1939 x1=0.11899 x0=1.3282 B1=69.152 B0=0.0001 normamps=525.000000 units=km
+New "LineCode.2_al_1u_1" nphases=1 r1=1.3703 r0=1.3703 x1=0.38276 x0=0.38276 B1=38.765 B0=38.765 normamps=180.000000 units=km
+New "LineCode.2_al_3" nphases=3 r1=1.0961 r0=1.9188 x1=0.33138 x0=0.48554 B1=58.147 B0=0.0001 normamps=180.000000 units=km
+New "LineCode.2_cu_1" nphases=1 r1=0.91971 r0=0.91971 x1=0.23401 x0=0.23401 B1=38.765 B0=38.765 normamps=230.000000 units=km
+New "LineCode.2_cu_3" nphases=3 r1=0.67257 r0=1.414 x1=0.17057 x0=0.36089 B1=58.147 B0=0.0001 normamps=230.000000 units=km
+New "LineCode.2_sal_1" nphases=1 r1=1.3703 r0=1.3703 x1=0.38276 x0=0.38276 B1=38.765 B0=38.765 normamps=180.000000 units=km
+New "LineCode.2_sal_3" nphases=3 r1=1.0961 r0=1.9188 x1=0.33138 x0=0.48554 B1=58.147 B0=0.0001 normamps=180.000000 units=km
+New "LineCode.4/0_al_3" nphases=3 r1=0.21326 r0=0.86613 x1=0.13776 x0=0.27887 B1=89.064 B0=0.0001 normamps=380.000000 units=km

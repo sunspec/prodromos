@@ -1,0 +1,1 @@
+New "Transformer.Tran1" phases=3 windings=2 buses=[b_1, b_2, ] conns=[delta, wye, ] kVs=[115, 12.47, ] kVAs=[30000, 30000, ] Xhl=15.51 sub=y buses=[b_1, b_2, ] conns=[delta, wye, ] kVs=[115, 12.47, ] kVAs=[30000, 30000, ] taps=[1, 1, ] wdg=1 %R=0.05 wdg=2 %R=0.05

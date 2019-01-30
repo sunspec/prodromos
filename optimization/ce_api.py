@@ -101,7 +101,7 @@ if __name__ == "__main__":
            "epri2": {'excitation': "injectingQ", 'pf': 0.93, 'forecast': None},
            "epri3": {'excitation': "injectingQ", 'pf': -0.88, 'forecast': None}}
 
-    api.get_forecasts(der=der)
+    der = api.get_forecasts(der=der)
     print(der)
 
     api.set_pf(der=der)

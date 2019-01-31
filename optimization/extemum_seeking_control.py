@@ -332,6 +332,8 @@ if __name__ == "__main__":
 
     # Enter or read the Power Factor limits from the DER devices
     pf_lim = [0.8, 0.85, 0.85]
+    # Some devices will not follow PF commands below a specific power level.
+    p_pu_req_for_pf_control = [0.5, None, None]  # per unit.  If the DER doesn't have this limit, use None
 
     restart_count = 0
     while True:  # Continuous control loop, restarted when u_lim drops below any 'a' parameter
@@ -344,9 +346,16 @@ if __name__ == "__main__":
 
         time.sleep(1)  # Allow DER devices time to update their power measurements after changing power factors
 
+        # init power check
+        power_limits_ok = True
+
         # Do not begin the ESC controller until all the DER devices can create the probing signal
         uhatk_lim = [-1., -1., -1.]  # Initialize limits below 0.  They must be >= 0 to proceed into the ESC loop
-        while not all(probe_range >= 0 for probe_range in uhatk_lim):
+        while (not all(probe_range >= 0 for probe_range in uhatk_lim)) or (not power_limits_ok):
+
+            # reinitialize power check each time through while loop
+            power_limits_ok = True
+
             # Measure/read the power of the DERs
             for n in range(n_der):
                 if n == 0:
@@ -360,6 +369,13 @@ if __name__ == "__main__":
                 # This code assumes fixed power factor limits. Some devices may have larger PF limits at low irradiance.
                 a_avail = p_now * math.tan(math.acos(pf_lim[n]))
                 uhatk_lim[n] = a_avail - a[n]  # uhatk_lim is the reactive power limit minus probing signal mag
+
+                if p_pu_req_for_pf_control[n] is not None:
+                    if p_pu_req_for_pf_control[n] > (p_now/va_lim[n]):
+                        power_limits_ok = False
+                        print('DER %s does not have enough active power to issue power factor commands. '
+                              'Per unit power must be %0.3f and the power level is only %0.3f. Waiting...' %
+                              (n, p_pu_req_for_pf_control[n], (p_now/va_lim[n])))
 
             print('Current probing signal ranges: %s. All must be positive to begin the ESC program.' % uhatk_lim)
             time.sleep(1)
@@ -416,10 +432,21 @@ if __name__ == "__main__":
 
                     # Update the uhatk_limits based on the maximum DER power (as PV irradiance changes)
                     a_avail = known_p_lim[n] * math.tan(math.acos(pf_lim[n]))
+
+                    # If the probing signal is larger than the available range of reactive power, reset the ESC
                     if a_avail < a[n]:
-                        # If the probing signal is larger than the available range of reactive power, reset the ESC
                         print('The probing signal cannot be created for DER %i, restarting the ESC controller.' % (n+1))
                         restart_esc = True
+
+                    # Check that the DER didn't drop below a power level required to issue PF commands
+                    # TODO: only reset one of the DER probing signals, not all of them, upon failure of these criteria
+                    elif p_pu_req_for_pf_control[n] is not None:
+                        if p_pu_req_for_pf_control[n] > (p_now/va_lim[n]):
+                            restart_esc = True
+                            print('DER %s does not have enough active power to issue power factor commands. '
+                                  'Per unit power must be %0.3f and the power level is only %0.3f. Waiting...' %
+                                  (n, p_pu_req_for_pf_control[n], (p_now/va_lim[n])))
+
                     else:
                         # If the probing signal sinusoid can be created from available DER Q, update uhatk_lim
                         # Cap the reactive power request at the power factor limit minus the probing signal amplitude.

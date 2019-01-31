@@ -1,0 +1,12 @@
+New "Line.Line149" length=3.429618 linecode=750_CU_UG_Phs3 normamps=520 emergamps=850 r1=2.45E-005 r0=6.11E-005 x1=3.42E-005 x0=2.02E-005 C1=0.0341761 C0=0.0341761 units=ft bus1=b_2.1.2.3 bus2=b_11.1.2.3
+New "Line.Line150" linecode=750_CU_UG_Phs3 emergamps=850 normamps=520.00 length=11712.13 r1=2.342213E-005 r0=0.0001107296 x1=0.0001078957 x0=0.0003761261 C1=0.0341761 C0=0.0341761 units=ft bus1=b_11.1.2.3 bus2=b_5.1.2.3
+New "Line.Line135" linecode=2/0_ACSR_Phs3 emergamps=280 length=180.1152 r1=0.0001333 r0=0.0002449 x1=0.0001556 x0=0.0004855 C1=0.0341761 C0=0.0341761 units=ft normamps=280.00 bus1=b_5.1.2.3 bus2=b_9.1.2.3
+New "Line.Line105" linecode=2/0_ACSR_Phs3 emergamps=280 normamps=280.00 length=11274.37 r1=0.000217566 r0=0.0003305754 x1=0.0001579416 x0=0.0004867131 C1=0.0341761 C0=0.0341761 units=ft bus1=b_9.1.2.3 bus2=b_10.1.2.3
+New "Line.Line59" linecode=795_AAC_Phs3 emergamps=600 length=3592.342 r1=2.27E-005 r0=0.0001062 x1=0.0001129 x0=0.0004013 C1=0.0341761 C0=0.0341761 units=ft normamps=550.00 bus1=b_5.1.2.3 bus2=b_6.1.2.3
+New "Line.Line188" linecode=795_AAC_Phs3 emergamps=600 normamps=550.00 length=1162.069 r1=2.27E-005 r0=0.0001062 x1=0.0001129 x0=0.0004012999 C1=0.0341761 C0=0.0341761 units=ft bus1=b_6.1.2.3 bus2=b_8.1.2.3
+New "Line.Line97" length=263.5357 linecode=795_AAC_Phs3 normamps=550 emergamps=600 r1=2.27E-005 r0=0.0001062 x1=0.0001129 x0=0.0004013 C1=0.0341761 C0=0.0341761 units=ft bus1=b_8.1.2.3 bus2=b_7.1.2.3
+New "Line.Line88" length=262.2357 linecode=795_AAC_Phs3 normamps=550 emergamps=600 r1=2.27E-005 r0=0.0001062 x1=0.0001129 x0=0.0004013 C1=0.0341761 C0=0.0341761 units=ft bus1=b_7.1.2.3 bus2=b_3.1.2.3
+New "Line.Line4" linecode=795_AAC_Phs3 emergamps=600 normamps=550.00 length=1030.5 r1=2.484238E-005 r0=0.0001063377 x1=0.0001042021 x0=0.000354926 C1=0.0341761 C0=0.0341761 units=ft bus1=b_3.1.2.3 bus2=b_4.1.2.3
+New "Line.Line164" length=78.86237 linecode=750_AL_UG_Phs3 normamps=400 emergamps=600 r1=3.2E-005 r0=9.96E-005 x1=3.62E-005 x0=2.57E-005 C1=0.0341761 C0=0.0341761 units=ft bus1=b_4.1.2.3 bus2=b_12.1.2.3
+New "Line.Line167" linecode=397_AAC_Phs3 emergamps=590 length=130.1262 r1=4.46E-005 r0=0.0001281 x1=0.0001212 x0=0.0004096 C1=0.0341761 C0=0.0341761 units=ft normamps=530.00 bus1=b_6.1.2.3 bus2=b_13.1.2.3
+New "Line.Line196" linecode=750_CU_UG_Phs3 emergamps=850 Switch=True enabled=true normamps=520.00 length=29.45287 r1=0.0001820739 r0=0.0003053387 x1=0.0002192185 x0=0.0001938803 C1=0.0341761 C0=0.0341761 units=m bus1=b_14.1.2.3 bus2=b_13.1.2.3

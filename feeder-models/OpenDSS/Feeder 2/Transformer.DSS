@@ -1,0 +1,3 @@
+New "Transformer.Tran1" phases=1 Xhl=0.1 %loadloss=0.01 %noloadloss=0.0025 buses=[b_1.1, b_15.1, ] conns=[wye, wye, ] kVs=[7.967434, 7.967434, ] kVAs=[3330, 3330, ] taps=[1, 1.00625, ] wdg=1 %R=0.005 wdg=2 %R=0.005
+New "Transformer.Tran2" phases=1 Xhl=0.1 %loadloss=0.01 %noloadloss=0.0025 buses=[b_1.2, b_15.2, ] conns=[wye, wye, ] kVs=[7.967434, 7.967434, ] kVAs=[3330, 3330, ] taps=[1, 0.99375, ] wdg=1 %R=0.005 wdg=2 %R=0.005
+New "Transformer.Tran3" phases=1 Xhl=0.1 %loadloss=0.01 %noloadloss=0.0025 buses=[b_1.3, b_15.3, ] conns=[wye, wye, ] kVs=[7.967434, 7.967434, ] kVAs=[3330, 3330, ] taps=[1, 1.0125, ] wdg=1 %R=0.005 wdg=2 %R=0.005

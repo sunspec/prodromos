@@ -535,6 +535,7 @@ def _align_data_to_forecast(fstart, fend, deltat, history):
 
     # trim to start at first index in idr (in phase with forecast start),
     # and don't overrun history
+
     idata = newdata[(newdata.index>=idr[0]) &
                     (newdata.index<=idr[-1]) &
                     (newdata.index<=history.index[-1])].copy()
@@ -671,7 +672,6 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
     """
 
     # TODO: input validation
-
 
     fitdata, f_intervals = _get_data_for_ARMA_forecast(start, end,
                                                        deltat, history,

@@ -98,8 +98,6 @@ if __name__ == "__main__":
 
     username = "fake"
     password = "fake"
-    username = "sandia.api"
-    password = "5and1A"
 
     api = CE_API(username=username, password=password)
 

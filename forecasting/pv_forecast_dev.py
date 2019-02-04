@@ -2,85 +2,14 @@
 #from multiprocessing import Manager
 
 import pvlib
-import pytz
-from datetime import datetime
 from datetime import timedelta
 from math import ceil
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-class PVobj():
-    # create an instance of a PV class object
-    def __init__(self, derid, lat, lon, alt, tz,
-                 tilt, azimuth, dc_capacity, ac_capacity,
-                 tracking=False, max_angle=90, backtrack=True, gcr=2.0/7.0,
-                 forecast_method='persistence', sunrise=None,
-                 surrogateid=None):
-
-        self.derid = derid
-        # TODO: using a surrogate in forecasting is NOT implemented
-        self.surrogateid = surrogateid
-        if forecast_method.lower() in ['arma', 'persistence']:
-            self.forecast_method = forecast_method.lower()
-        else:
-            # TODO: raise error
-            warnstring = 'DER ID ' + str(derid) + \
-               ' : no forecast method specified, default to persistence'
-            raise RuntimeWarning(warnstring)
-            self.forecast_method = None
-        self.sunrise = sunrise
-        self.dc_capacity = dc_capacity
-        self.ac_capacity = ac_capacity
-        self.lat = lat
-        self.lon = lon
-        self.alt = alt
-        self.timezone = tz
-        self.tracking = tracking
-        if not tracking:
-            self.tilt = tilt
-            self.azimuth = azimuth
-        else:
-            self.axis_tilt = tilt
-            self.axis_azimuth = azimuth
-            self.max_angle = max_angle
-            self.backtrack = backtrack
-            self.gcr = gcr
 
 
-    # PVobj member functions
-    def forecast(self,
-                 start,
-                 end,
-                 history,
-                 deltat=timedelta(minutes=15),
-                 dataWindowLength=timedelta(hours=1),
-                 order=(1, 1, 0),
-                 sunrise=None):
-
-        # wrapper for functions forecast_ARMA and forecast_persistence
-
-        if self.forecast_method=='arma':
-            return forecast_ARMA(self, 
-                                 start,
-                                 end,
-                                 history,
-                                 deltat,
-                                 dataWindowLength,
-                                 order)
-
-        elif self.forecast_method=='persistence':
-            return forecast_persistence(self,
-                                        start,
-                                        end,
-                                        history,
-                                        deltat,
-                                        dataWindowLength)
-        else:
-            raise ValueError('{} is not a valid forecast method'
-                             .format(self.forecast_method))
+NS_PER_HR = 1.e9 * 3600.  # nanoseconds per hour
 
 
 # Forecast functions
@@ -97,9 +26,6 @@ def solar_position(pvobj, dr):
 
     return sp
 
-# block of code copied here pending pvlib v0.6.1
-
-NS_PER_HR = 1.e9 * 3600.  # nanoseconds per hour
 
 def _hour_angle_to_hours(times, hourangle, longitude, equation_of_time):
     """converts hour angles in degrees to hours as a numpy array"""
@@ -775,6 +701,20 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
     model = sm.tsa.statespace.SARIMAX(fitdata,
                                       trend='n',
                                       order=order)
+    # if not provided, generate guess of model parameters, helps overcome
+    # non-stationarity
+
+    if not start_params:
+        # generate a list with one entry '0' for each AR or MA parameter
+        # plus an entry '1' for the variance parameter
+        start_params = []
+        for i in range(0, order[0]+order[2]):
+            start_params.append(0)
+        start_params.append(1)
+
+    # generate the ARMA model object
+
+    results = model.fit(start_params=start_params)
 
     # if not provided, generate guess of model parameters, helps overcome
     # non-stationarity
@@ -826,86 +766,3 @@ def forecast_ARMA(pvobj, start, end, history, deltat,
     f[f.index > ss] = 0.0
 
     return f[fdr]
-
-
-
-if __name__ == "__main__":
-
-    USMtn = pytz.timezone('US/Mountain')
-    if pvlib.__version__ < '0.5.1':
-        print('pvlib out-of-date, found version ' + pvlib.__version__ +
-              ', please upgrade to 0.5.1 or later')
-    else:
-        # make a dict of PV system objects
-        pvdict = {};
-        pvdict['sunpower'] = PVobj('sunpower',
-                                        dc_capacity=1900,
-                                        ac_capacity=3000,
-                                        lat=35.05,
-                                        lon=-106.54,
-                                        alt=1657,
-                                        tz=USMtn,
-                                        tilt=35,
-                                        azimuth=180,
-                                        tracking=True,
-                                        max_angle=90,
-                                        backtrack=True,
-                                        gcr=2.0/7.0,
-                                        forecast_method='arma',
-                                        sunrise='yesterday')
-
-        from dateutil import parser
-        timestamps = [parser.parse(ts).replace(tzinfo=pytz.UTC).astimezone(USMtn)
-                      for ts in ['2018-02-18T16:00:00',
-                                 '2018-02-18T16:15:00',
-                                 '2018-02-18T16:30:00',
-                                 '2018-02-18T16:45:00']]
-        values = [300.0, 400.1, 500.2, 600.3]
-        history = pd.Series(data=values, index=pd.DatetimeIndex(timestamps),
-                            dtype=np.float)
-        start = parser.parse('2018-02-18T17:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
-        end = parser.parse('2018-02-18T18:00:00').replace(tzinfo=pytz.UTC).astimezone(USMtn)
-
-        fc = pvdict['sunpower'].forecast(start=start,
-                                         end=end,
-                                         history=history,
-                                         deltat=timedelta(minutes=15),
-                                         dataWindowLength=timedelta(hours=1))
-
-        print(fc)
-#
-#        dt = pd.DatetimeIndex(start='2018-02-18 05:30:00',
-#                              end='2018-02-20 00:00:00',
-#                              freq='15T').tz_localize('MST')
-#        cspower = get_clearsky_power(pvdict['sunpower'], dt)
-#        history = cspower['ac_power']
-#
-#        fc_res = []
-#        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
-#        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
-#            end = start + timedelta(hours=1)
-#            fc_res.append(pvdict['sunpower'].forecast(start, end,
-#                          history, timedelta(minutes=15),
-#                          timedelta(hours=1)))
-#            start += timedelta(minutes=30)
-#
-##        for fc in fc_res:
-##            plt.plot(fc, 'x')
-##        plt.show()
-#
-#        # change history
-#        history = cspower['ac_power']
-#        history.iloc[5:10] *= 5.0;
-#        fc_res = []
-#        start = datetime(2018, 2, 19, 6, 0, 0, tzinfo=pytz.timezone('MST'))
-#        while start< datetime(2018, 2, 19, 12, 0, 0, tzinfo=pytz.timezone('MST')):
-#            end = start + timedelta(hours=1)
-#            fc_res.append(pvdict['sunpower'].forecast(start, end,
-#                          history, timedelta(minutes=15),
-#                          timedelta(hours=1)))
-#            start += timedelta(minutes=30)
-#
-#        plt.plot(history, '-')
-#        for fc in fc_res:
-#            plt.plot(fc, 'x')
-#        plt.show()

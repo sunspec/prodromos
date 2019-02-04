@@ -6,8 +6,6 @@ Simple code for gathering forecasts and adjusting the power factors for multiple
 
 import requests
 from requests.auth import HTTPBasicAuth
-import json
-import pandas as pd
 
 
 class CE_API(object):
@@ -15,11 +13,9 @@ class CE_API(object):
     def __init__(self, username=None, password=None):
 
         self.proxy = {'http': 'http://wwwproxy.sandia.gov:80'}
-        self.pf_url = "https://sandia-dm.cnrg.com/api/sandia/pf"
-        self.forecast_url = "https://sandia-dm.cnrg.com/api/pvanalysis/forecast/next"
+        self.url = "https://sandia-dm.cnrg.com/api/sandia/pf"
         self.usern = username
         self.passw = password
-        self.auth = HTTPBasicAuth(self.usern, self.passw)
         self.headers = {'Content-type': 'application/json'}
 
         self.n_der = None
@@ -42,7 +38,7 @@ class CE_API(object):
         self.n_der = 0
 
         setpoints = []
-        for der_id, pf_info in self.der.items():
+        for der_id, pf_info in self.der.iteritems():
             self.n_der += 1
             # print(der, pf_info)
             setpoint = ({
@@ -63,36 +59,36 @@ class CE_API(object):
 
         print(pf_cmd)
 
-        resp = requests.post(self.pf_url, json=pf_cmd, auth=self.auth,
-                             proxies=self.proxy, headers=self.headers,
-                             verify=False)
+        auth = HTTPBasicAuth(self.usern, self.passw)
+        resp = requests.post(self.url, json=pf_cmd, auth=auth, proxies=self.proxy, headers=self.headers, verify=False)
         print('Data Posted! statusMessage: %s' % resp)
 
-    def get_forecasts(self, der_ids):
+    def get_forecasts(self, der):
         """
-        Get the forecast for a DER device
+        Get the forecasts of DER devices
 
-        :param der_ids: list of str, names of the DER device
+        :param der: dict of DER devices where the keys are the Connected Energy DER IDs, e.g.,
 
-        :return forecasts: dict of pandas Series, keys are der_ids
+        der = {"epri1": {'excitation': "injectingQ", 'pf': -0.95, 'forecast': None},
+               "epri2": {'excitation': "injectingQ", 'pf': -0.93, 'forecast': None},
+               "epri3": {'excitation': "injectingQ", 'pf': -0.88, 'forecast': None}}
+
+        :return: der dict with updated forecasts
         """
 
-        forecasts = {}
-        for der_id in der_ids:
+        self.der = der
+
+        proxy = {'http': 'http://wwwproxy.sandia.gov:80'}
+        url = "https://sandia-dm.cnrg.com/api/pvanalysis/forecast/next"
+
+        for der_id, pf_info in self.der.iteritems():
             payload = {'footprint': der_id}
             headers = {}
-            resp = requests.get(self.forecast_url, params=payload, 
-                                auth=self.auth, proxies=self.proxy,
-                                headers=headers, verify=False)
-            points = json.loads(resp.content.decode('utf-8'))
-            idx = []
-            fc = []
-            for p in points:
-                idx.append(pd.to_datetime(p['timestamp'], utc=True))
-                fc.append(p['forecast'])
-            forecast = pd.Series(data=fc, index=idx, dtype=float)
-            forecasts[der_id] = forecast
-        return forecasts
+            auth = HTTPBasicAuth(self.usern, self.passw)
+            resp = requests.get(url, params=payload, auth=auth, proxies=proxy, headers=headers, verify=False)
+            self.der[der_id]['forecast'] = resp.content  # add the forecast to the der dict
+
+        return self.der
 
 if __name__ == "__main__":
 
@@ -103,12 +99,11 @@ if __name__ == "__main__":
 
     der = {"epri1": {'excitation': "injectingQ", 'pf': -0.95, 'forecast': None},  # neg = Q4 (EPRI sign convention)
            "epri2": {'excitation': "injectingQ", 'pf': 0.93, 'forecast': None},
-           "epri3": {'excitation': "injectingQ", 'pf': -0.88, 'forecast': None},
-           "sunpower2201": {'excitation': "injectingQ", 'pf': 1.0, 'forecast': None}}
+           "epri3": {'excitation': "injectingQ", 'pf': -0.88, 'forecast': None}}
 
-    fc = api.get_forecasts(der_ids=['sunpower2201'])
-    print(fc)
+    der = api.get_forecasts(der=der)
+    print(der)
 
-#    api.set_pf(der=der)
+    api.set_pf(der=der)
 
 

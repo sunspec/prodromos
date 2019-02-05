@@ -1,0 +1,3 @@
+New "PVSystem.PVSy1" phases=3 kv=12.47 conn=wye irradiance=1 Pmpp=1000 kVA=1000 pf=1 %Cutin=0.1 %Cutout=0.1 bus1=B_12 LimitCurrent=yes vminpu=0.85 balanced=yes duty=PVprofile
+New "PVSystem.PVSy2" phases=3 kv=12.47 conn=wye irradiance=1 Pmpp=10000 kVA=10000 pf=1 %Cutin=0.1 %Cutout=0.1 bus1=B_14 LimitCurrent=yes vminpu=0.85 balanced=yes duty=PVprofile
+New "PVSystem.PVSy3" phases=3 kv=0.48 conn=wye irradiance=1 Pmpp=258 kVA=258 pf=1 %Cutin=0.1 %Cutout=0.1 bus1=B_15 LimitCurrent=yes vminpu=0.85 balanced=yes duty=PVprofile

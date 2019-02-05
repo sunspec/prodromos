@@ -1,0 +1,2 @@
+New loadshape.loadprofile npts=4369 minterval=60 mult=[file=PerUnitProfiles.csv, col=2, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile npts=4369 minterval=60 mult=[file=PerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize

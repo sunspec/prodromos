@@ -396,8 +396,8 @@ if __name__ == "__main__":
                 J.append(0)  # initialize objective function at 0 for this time step
                 for j in range(n_v_meas_points):
                     v_measurement.append(240.)  # imaginary voltage measurement  ^^^^ Add voltage measurements here!
-                    # objective function is the summation of the square voltage error
-                    J[i] += (v_measurement[j]-v_nom[j])**2
+                    # objective function is the summation of the square pu voltage errors (the mean square error)
+                    J[i] += (((v_measurement[j]-v_nom[j])/v_nom[j])**2)/n_v_meas_points
 
                 # ts.log_debug('ES Control for SW inverters')
                 uk = [None]*n_der       # u's for step k

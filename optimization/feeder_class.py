@@ -58,22 +58,22 @@ class Feeder():
         """
         curr_loads = self.DSS.get_loads()
         load_fc = {}
-        for b in curr_loads.keys():
-            Pmult = np.tile(curr_loads[b].Pmult[0], periods)
-            load_fc[b] = dss_util.Load(curr_loads[b].kW, Pmult)
+        for bus in curr_loads.keys():
+            Pmult = np.tile(curr_loads[bus].Pmult[0], periods)
+            load_fc[bus] = dss_util.Load(bus, curr_loads[bus].kW, Pmult)
         return load_fc
 
     def update_loads(self, loads):
-        """ Updates loads for each bus
+        """ Updates load in DSS for each bus
 
         Args:
             loads: dict {load name: load} where load is of type Load
         """
-        for b in loads.keys():
-            self.DSS.set_load(b, loads[b].Pmult)
+        for bus in loads.keys():
+            self.DSS.set_load(bus, loads[bus].Pmult)
 
     def update_power_factors(self, pvlist, pv_forecast, load_forecast, 
-                             stepsize, numsteps, options):
+                             hour, sec, stepsize, numsteps, options):
         """
         Determines new power factor settings.
         
@@ -88,6 +88,8 @@ class Feeder():
                 {loadid, forecast} for each bus on the Feeder.
                 loadid: str
                 forecast: numeric
+            hour: int
+            sec: int
             stepsize: str
                 interval in pv_forecast and load_forecast, of the form 'XXm'
                 where XX is number of minutes
@@ -100,17 +102,19 @@ class Feeder():
                 {pv, pf} where pv is in pvlist
         """
         pvlist = self.pv_on_feeder
-        curr_pf = []
-        pf_ub = []
-        pf_lb = []
+        curr_pf = {}
+        pf_ub = {}
+        pf_lb = {}
         for pv in pvlist:
-            curr_pf.append(self.pf[pv])
-            pf_ub.append(self.pv[pv].pf_max)
-            pf_lb.append(self.pv[pv].pf_min)
-        change, new_pf = dss_util.update_power_factors(curr_pf, pv_forecast,
-                                                       load_forecast, self.DSS,
+            curr_pf[pv] = self.pf[pv]
+            pf_ub[pv] = self.pv[pv].pf_max
+            pf_lb[pv] = self.pv[pv].pf_min
+
+        change, new_pf = self.DSS.update_power_factors(curr_pf, pv_forecast,
+                                                       load_forecast,
                                                        pvlist, hour, sec,
-                                                       pf_lb, pf_ub, options)
+                                                       pf_lb, pf_ub, stepsize,
+                                                       numsteps, options)
         if change:
             pf = {pv: pf for (pv, pf) in zip(pvlist, new_pf)}
         else:

@@ -84,14 +84,15 @@ class CE_API(object):
             resp = requests.get(self.forecast_url, params=payload, 
                                 auth=self.auth, proxies=self.proxy,
                                 headers=headers, verify=False)
-            points = json.loads(resp.content.decode('utf-8'))
-            idx = []
-            fc = []
-            for p in points:
-                idx.append(pd.to_datetime(p['timestamp'], utc=True))
-                fc.append(p['forecast'])
-            forecast = pd.Series(data=fc, index=idx, dtype=float)
-            forecasts[der_id] = forecast
+            if resp.status_code == 200:
+                points = json.loads(resp.content.decode('utf-8'))
+                idx = []
+                fc = []
+                for p in points:
+                    idx.append(pd.to_datetime(p['timestamp'], utc=True))
+                    fc.append(p['forecast'])
+                forecast = pd.Series(data=fc, index=idx, dtype=float)
+                forecasts[der_id] = forecast
         return forecasts
 
 if __name__ == "__main__":

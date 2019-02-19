@@ -1,0 +1,19 @@
+New "Load.Load136" phases=1 kW=0 kvar=0.003438665 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_11.1 duty=loadprofile136
+New "Load.Load137" phases=1 kW=3.860344758 kvar=0.489471522 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_11.2 duty=loadprofile137
+New "Load.Load138" phases=1 kW=2.670415479 kvar=0.302451287 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_11.3 duty=loadprofile138
+
+New "Load.Load139" phases=1 kW=0.028182185 kvar=-0.00895 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_5.1 duty=loadprofile139
+New "Load.Load140" phases=1 kW=2.288289329 kvar=0.41371859 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_5.2 duty=loadprofile140
+New "Load.Load141" phases=1 kW=0.393998726 kvar=0.154409997 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_5.3 duty=loadprofile141
+
+New "Load.Load142" phases=1 kW=97.118471073 kvar=22.060387399 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_9.1 duty=loadprofile142
+New "Load.Load143" phases=1 kW=100.579630241 kvar=22.407056152 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_9.2 duty=loadprofile143
+New "Load.Load144" phases=1 kW=116.317688067 kvar=25.61554001 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_9.3 duty=loadprofile144
+
+New "Load.Load133" phases=1 kW=107.384198104 kvar=11.558831106 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_10.1 duty=loadprofile133
+New "Load.Load134" phases=1 kW=108.561893753 kvar=11.911280386 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_10.2 duty=loadprofile134
+New "Load.Load135" phases=1 kW=118.930157052 kvar=12.605383418 kV=7.199557857 status=variable model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_10.3 duty=loadprofile135
+
+New "Load.Load19" phases=3 kV=0.48 kW=25.5 kvar=19.2 status=variable conn=wye model=5 Vmaxpu=1.3 Vminpu=0.7 bus1=b_15 duty=loadprofile19
+
+New "Load.Load20" phases=3 kV=12.47 kW=1885 kvar=1292 status=variable conn=wye model=5 Vmaxpu=1.3 Vminpu=0.7 bus1=b_4 duty=loadprofile20

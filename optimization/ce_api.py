@@ -48,7 +48,7 @@ class CE_API(object):
             setpoint = ({
                          "der_number": der_id,  # e.g., "sunpower2202"
                          "opendss_name": "some name 1",
-                         "reactive_power_target": "5000",
+                         "reactive_power_target": "unknown",
                          "pf_setpoint_magnitude": pf_info["pf"],
                          "excitation": pf_info["excitation"]
                         })
@@ -94,6 +94,7 @@ class CE_API(object):
                 forecast = pd.Series(data=fc, index=idx, dtype=float)
                 forecasts[der_id] = forecast
         return forecasts
+
 
 if __name__ == "__main__":
 

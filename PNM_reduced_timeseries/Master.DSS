@@ -1,0 +1,25 @@
+Clear
+New Circuit.feeder basekv=115 pu=1.0001 phases=3 bus1=b_1 angle=0 R1 = 1.5 X1 = 8.0 R0 = 2.5 X0 = 12.0
+!MVAsc3=1624.8 MVAsc1=1390.4  <-  with the R1 R0 and X1 X0 values above, the MVAsc values are these.
+!You can set the short-circuit current really high (MVAsc3=2000000 MVAsc1=2100000) if you want it to look more like an infinite bus
+
+
+Redirect LineCode.DSS
+Redirect Lines.dss
+Redirect Transformers.dss
+!Redirect Shunts.dss  !The shunt reactors have been removed from this model because they do not impact the simulation much but add complexity.
+Redirect Loadshapes.dss
+Redirect Loads.dss
+Redirect Capacitors.dss
+Redirect Transformer.DSS
+Redirect PVSystem.DSS
+
+Redirect EnergyMeter.DSS
+MakeBusList
+
+Redirect BusVoltageBases.dss  ! set voltage bases
+calcVoltageBases
+
+Buscoords buscoords.dss
+
+solve

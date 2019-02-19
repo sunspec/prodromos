@@ -12,20 +12,86 @@ from pyswarm import pso
 import itertools
 
 
-class Load():
+# 2018-11-01 : modified by cwhanse@sandia.gov for python 3.5
+# 2019-2-19 : code clean up, expanded Load class - jjohns2@sandia.gov
 
-    def __init__(self, name, kW, vals):
-        Load.name = name
-        Load.kW = kW
-        Load.Pmult = vals
+class Load:
+    """
+    Load object
+    """
+
+    def __init__(self, name, phases=1, kW=None, kvar=None, kV=None, status='variable', model=5, Vmaxpu=1.3, Vminpu=0.7,
+                 enabled=True, bus1='b_1.1', duty='loadprofile1', vals=None):
+        """
+        Replicating parameters from OpenDSS Loads, e.g.,
+        New "Load.Load138" phases=1 kW=2.670415479 kvar=0.302451287 kV=7.199557857 status=variable
+        model=5 Vmaxpu=1.3 Vminpu=0.7 enabled=true bus1=b_11.3 duty=loadprofile138
+
+        :param name: str, name of the load, e.g., "load134"
+        :param kW: power
+        :param kvar: reactive power
+        :param vals: multiplier on the loadshape
+        :param phases: number of phases
+
+        """
+        self.name = name
+        self.phases = phases
+        self.kW = kW
+        self.kvar = kvar
+        self.kV = kV
+        self.status = status
+        self.model = model
+        self.Vmaxpu = Vmaxpu
+        self.Vminpu = Vminpu
+        self.enabled = enabled
+        self.bus1 = bus1
+        self.duty = duty
+        self.Pmult = vals
+        self.Qmult = None
+        self.phase = None  # [0] = A, [1] = B, [2] = C, [0, 1, 2] = ABC
+        self.determine_load_phases()
+
+    def determine_load_phases(self):
+        if self.bus1[-2] != '.':  # three phase case
+            self.phase = [0, 1, 2]
+        elif self.bus1[-1] == '1':
+            self.phase = [0]
+        elif self.bus1[-1] == '2':
+            self.phase = [1]
+        elif self.bus1[-1] == '3':
+            self.phase = [2]
+        else:
+            print('Unknown phasing for load %s. bus1: %s' % (self.name, self.bus1))
+
+        # print('Load %s has phases: %s' % (self.name, self.phase))
+
+    def update_load(self):
+        """
+        Replaces the beginning of the loadshape for each bus with the values
+        in load
+
+        Args:
+            bus: str, name of bus (OpenDSS load)
+            load: numeric, vector of load multipliers
+        """
+
+        engine = win32com.client.Dispatch("OpenDSSEngine.DSS")
+        # engine.Start("0")
+        circuit = engine.ActiveCircuit
+        circuit.Loads.Name = self.name
+
+        self.kW = circuit.Loads.kW
+        self.kvar = circuit.Loads.kvar
+
+        profile = circuit.ActiveElement.Properties('duty').val
+        circuit.Loadshapes.Name = profile
+        self.Pmult = np.array(circuit.Loadshapes.Pmult)
 
 
 class VVar_optim:
 
-    def __init__(self, penalty={'violation': 1.0, 'deviation': 1.0,
-                                'power_factor': 0.05},
-                       threshold={'violation': 0.05, 'accept': 0.02,
-                                  'object': 0.005}, debug=False, swarmsize=20,
+    def __init__(self, penalty={'violation': 1.0, 'deviation': 1.0, 'power_factor': 0.05},
+                       threshold={'violation': 0.05, 'accept': 0.02, 'object': 0.005}, debug=False, swarmsize=20,
                        maxiter=20, minstep=0.001, minfunc=1e-6):
         """
         Parameters
@@ -57,13 +123,11 @@ class VVar_optim:
         self.minfunc = minfunc
 
 
-# 2018-11-01 : modified by cwhanse@sandia.gov for python 3.5
-
-class DSS():
-# """
-# tshort@epri.com 2008-11-17
-# comments: wsunderman@epri.com 2009-10-30
-
+class DSS(object):
+    """
+    tshort@epri.com 2008-11-17
+    comments: wsunderman@epri.com 2009-10-30
+    """
 
     def __init__(self, filename):
         """
@@ -76,37 +140,41 @@ class DSS():
             text
             circuit
         """
-# start an embedded DSS engine through COM
-# note: OpenDSSEngine.dll must already be registered
+        # start an embedded DSS engine through COM
+        # note: OpenDSSEngine.dll must already be registered
         self.engine = win32com.client.Dispatch("OpenDSSEngine.DSS")
         self.engine.Start("0")
 
         self.filename = filename
-# use the Text interface to OpenDSS
+        # use the Text interface to OpenDSS
         self.text = self.engine.Text
         self.text.Command = "clear"
         self.circuit = self.engine.ActiveCircuit
         self.text.Command = "compile [" + self.filename + "]"
-#            self.text.Command = "New EnergyMeter.Feeder Line.L115 1"
+        # self.text.Command = "New EnergyMeter.Feeder Line.L115 1"
         self.text.Command = "solve" # not sure this is needed
 
-#        print(self.engine.Version)
+        # print(self.engine.Version)
 
     def solve(self, commands=[]):
-        # if filename is not empty, then compile the .dss file specified
-# note:  filename includes the path and the .dss file name
-# note:  the .dss file compiled is usually the master.dss file
-# note:  an energymeter should be defined at the head of the circuit
-# being modeled
-# note:  if compilation is successful we have a circuit instance
-# that represents the electric circuit that is being modeled
+        """
+        if filename is not empty, then compile the .dss file specified
+        note:  filename includes the path and the .dss file name
+        note:  the .dss file compiled is usually the master.dss file
+        note:  an energymeter should be defined at the head of the circuit
+        being modeled
+        note:  if compilation is successful we have a circuit instance
+        that represents the electric circuit that is being modeled
 
+        :param commands:
+        :return:
+        """
 
-# Execute list of commands
+        # Execute list of commands
         for c in commands:
             self.text.Command = c
         self.text.Command = "solve"
-#            self.text.Command = "Buscoords Buscoords.dat"   # load in bus coordinates
+        # self.text.Command = "Buscoords Buscoords.dat"   # load in bus coordinates
         self.populate_results()
 
     def run(self, power_factors, pvlist, hour, sec, pv_profile, load_profile,
@@ -155,10 +223,10 @@ class DSS():
         self.solve(commands)
     
         V = []
-    #    minterval = stepsize.strip('m')
+        # minterval = stepsize.strip('m')
         # set new load values
         for ld in load_profile.keys():
-            self.set_load(ld, load_profile[ld].Pmult)
+            self.set_load(ld, load_profile[ld])
         for (pv, pf) in zip(pvlist, power_factors):
             self.set_pv(pv, pv_profile[pv], pf)
 
@@ -265,7 +333,7 @@ class DSS():
         # first solve for voltage using current settings
         change_pf = False
         power_factors = [curr_pf[pv] for pv in pvlist]
-    #    numsteps = len(pv_fc[list(pv_fc.keys())[0]])
+        # numsteps = len(pv_fc[list(pv_fc.keys())[0]])
         V = self.run(power_factors, pvlist, hour, sec,
                      pv_profile=pv_forecast, load_profile=load_forecast,
                      periods=numsteps, stepsize=stepsize)
@@ -307,12 +375,27 @@ class DSS():
         p = self.circuit.Loads.First
         while p > 0:
             name = self.circuit.Loads.Name
+            phases = self.circuit.ActiveElement.Properties('phases').val
             kW = self.circuit.Loads.kW
+            kvar = self.circuit.Loads.kvar
+            kV = self.circuit.Loads.kV
+
+            status = self.circuit.Loads.status
+            model = self.circuit.Loads.model
+            Vmaxpu = self.circuit.Loads.Vmaxpu
+            Vminpu = self.circuit.Loads.Vminpu
+            enabled = self.circuit.ActiveElement.Properties('enabled').val
+            bus1 = self.circuit.ActiveElement.Properties('bus1').val
+
             profile = self.circuit.ActiveElement.Properties('duty').val
             self.circuit.Loadshapes.Name = profile
             Pmult = np.array(self.circuit.Loadshapes.Pmult)
-            loads[name] = Load(name, kW, Pmult)
-            p = self.circuit.Loads.Next # advance pointer
+
+            # instantiate the Load object with the discovered parameters
+            loads[name] = Load(name, phases, kW, kvar, kV, status, model, Vmaxpu, Vminpu, enabled, bus1,
+                               duty=profile, vals=Pmult)
+
+            p = self.circuit.Loads.Next  # advance pointer
         return loads
 
     def _edit_loadshape(self, name, val):
@@ -354,9 +437,12 @@ class DSS():
         profile = self.circuit.ActiveElement.Properties('duty').val
         self._edit_loadshape(profile, val)
 
-# method gets the bus and branch names of the DSS 'circuit' instance
-# also populates the branch currents and bus voltages
     def populate_results(self):
+        """
+        Method gets the bus and branch names of the DSS 'circuit' instance
+        also populates the branch currents and bus voltages
+        :return:
+        """
         self.bus = Bus(self.circuit)
         self.branch = Branch(self.circuit)
         self.bus_voltage = np.array(self.circuit.AllBusVmagPu)
@@ -368,21 +454,27 @@ class DSS():
             pf_result[pv] = self.text.result
         self.pf_result = pf_result
 
-
-# method plots the voltages and map in separate windows
-# and shows them
     def plots(self):
+        """
+        Method plots the voltages and map in separate windows and shows them
+
+        :return: None
+        """
         self.plot_voltage()
         self.plot_map()
         pyl.show()
 
-
-# method displays (prints) line name, number of phases,
-# voltages in actual volts and volts on a 120V basis,
-# displays currents, and calculates real power, reactive
-# power, and pf (displacement)
-# in a text window
     def print_branch_info(self, event):
+        """
+        Method displays (prints) line name, number of phases,
+        voltages in actual volts and volts on a 120V basis,
+        displays currents, and calculates real power, reactive
+        power, and pf (displacement)
+        in a text window
+
+        :param event:
+        :return: None
+        """
         ind = event.ind[0]
         print(" ")
         print("line: ", self.branch.name[ind])
@@ -399,32 +491,37 @@ class DSS():
 
         print(" ")
 
-# method does the plotting of the voltages on a 120V base versus distance
-# x = distance
-# y = voltage (120V base)
+
     def plot_voltage(self):
+        """
+        Method does the plotting of the voltages on a 120V base versus distance
+        x = distance
+        y = voltage (120V base)
+
+        :return: None
+        """
         fig = pyl.figure()
         def t(x): return x.transpose()
 
-#scale factor gets us to 120V from the kvbase which is set in the .dss file
+        # scale factor gets us to 120V from the kvbase which is set in the .dss file
         scalefactor = 1 / self.branch.kvbase * 120 / 1000
 
         x = self.branch.distance
         y = t(t(abs(self.branch.Vto)) * scalefactor)
         pyl.plot(x, y, '*', markersize=5, picker=5)
 
-#       # the following code will scale the size dot by the number of phases
-#       # it's nice, but it makes the code slow
-#         size = (self.branch.nphases + 1) ** 2
-#         scatter(self.branch.distance, abs(self.branch.Vto[:,0]), s = size, c = 'r', picker=5)
-#         scatter(self.branch.distance, abs(self.branch.Vto[:,1]), s = size, c = 'g', picker=5)
-#         scatter(self.branch.distance, abs(self.branch.Vto[:,2]), s = size, c = 'b', picker=5)
+        # the following code will scale the size dot by the number of phases
+        # it's nice, but it makes the code slow
+        # size = (self.branch.nphases + 1) ** 2
+        # scatter(self.branch.distance, abs(self.branch.Vto[:,0]), s = size, c = 'r', picker=5)
+        # scatter(self.branch.distance, abs(self.branch.Vto[:,1]), s = size, c = 'g', picker=5)
+        # scatter(self.branch.distance, abs(self.branch.Vto[:,2]), s = size, c = 'b', picker=5)
 
-# setup the pick events to highlight the voltage plot, circuit map,
-# and to display the branch info in the text box
-# note:  a pick event is usually a mouse click within a certain radius
-# of the actual points on the plots
-# note:  all three methods get called on any pick event
+        # setup the pick events to highlight the voltage plot, circuit map,
+        # and to display the branch info in the text box
+        # note:  a pick event is usually a mouse click within a certain radius
+        # of the actual points on the plots
+        # note:  all three methods get called on any pick event
         pyl.connect('pick_event', self.highlight_voltage_plot)
         pyl.connect('pick_event', self.highlight_map)
         pyl.connect('pick_event', self.print_branch_info)
@@ -441,13 +538,19 @@ class DSS():
         for o in fig.findobj(text.Text):
             o.set_fontsize(18)
 
-# set the limits (x and y) of the plot to contain all of the points
+        # set the limits (x and y) of the plot to contain all of the points
         pyl.xlim(x[x > 0].min(), x.max())
         pyl.ylim(y[y > 0].min(), y.max())
 
-# method highlights the voltage plot based on
-# the x and y coordinates of the pick event (mouse click)
+
     def highlight_voltage_plot(self, event):
+        """
+        Method highlights the voltage plot based on
+        The x and y coordinates of the pick event (mouse click)
+
+        :param event:
+        :return:
+        """
         pyl.axis = event.artist.get_axes()
         ind = event.ind[0]
         x = self.branch.distance[ind].repeat(3)
@@ -456,59 +559,67 @@ class DSS():
         self.selected.set_data(x, y)
         self.fig.canvas.draw()
 
-# method does the plotting of the map of the circuit
-# note:  master file should have the following text in it
-# Buscoords buscoords.dss, where buscoords.dss contains the x and y
-# coordinates for each bus to be plotted
+
     def plot_map(self):
+        """
+        Method does the plotting of the map of the circuit
+        note:  master file should have the following text in it
+        Buscoords buscoords.dss, where buscoords.dss contains the x and y
+        coordinates for each bus to be plotted
+        :return:
+        """
         fig = pyl.figure()
 
-# get x and y coordinates of the branch to be drawn
-# the branch is a line so it is defined with pairs of
-# from and to coordinates
+        # get x and y coordinates of the branch to be drawn
+        # the branch is a line so it is defined with pairs of
+        # from and to coordinates
         x1 = self.branch.x
         y1 = self.branch.y
         x2 = self.branch.xto
         y2 = self.branch.yto
         pyl.axes().set_aspect('equal', 'datalim')
 
-# don't want to see any ticks on the x-axis or the y-axis
+        # don't want to see any ticks on the x-axis or the y-axis
         pyl.xticks([])
         pyl.yticks([])
 
-# set the limits of the map plot
+        # set the limits of the map plot
         pyl.xlim(x1.min(), x1.max())
         pyl.ylim(y1.min(), y1.max())
 
-# take the from x and y coordinates and the to x and y coordinates
-# and put them together (zip) as a python sequence object
+        # take the from x and y coordinates and the to x and y coordinates
+        # and put them together (zip) as a python sequence object
         segments = [ ( (thisx1, thisy1), (thisx2, thisy2) )  for thisx1,
                     thisy1, thisx2, thisy2 in zip(x1,y1,x2,y2)]
 
-# make a LineCollection of the segments, with width indicating the number
-# of phases
+        # make a LineCollection of the segments, with width indicating the number
+        # of phases
         line_segments = LineCollection(segments,
                                        linewidths    = self.branch.nphases*1.5,
                                        linestyle = 'solid', picker = 5)
         pyl.gca().add_collection(line_segments)
 
-# setup the pick events to highlight the voltage plot, circuit map,
-# and to display the branch info in the text box
-# note:  a pick event is usually a mouse click within a certain radius
-# of the actual points on the plots
+        # setup the pick events to highlight the voltage plot, circuit map,
+        # and to display the branch info in the text box
+        # note:  a pick event is usually a mouse click within a certain radius
+        # of the actual points on the plots
         pyl.connect('pick_event', self.highlight_voltage_plot)
         pyl.connect('pick_event', self.highlight_map)
         pyl.connect('pick_event', self.print_branch_info)
         self.mapfig = fig
-# plot a yellow circle at the 'to' bus of the line segment if clicked on with
-# the mouse
+
+        # plot a yellow circle at the 'to' bus of the line segment if clicked on with
+        # the mouse
         self.mapselected,  = pyl.plot([x2[0]], [y2[0]], 'o', ms=12, alpha=0.4,
                                       color='yellow', visible=False)
 
-
-# method highlights the map plot based on
-# the x and y coordinates of the pick event (mouse click)
     def highlight_map(self, event):
+        """
+        Method highlights the map plot based on
+        the x and y coordinates of the pick event (mouse click)
+        :param event:
+        :return:
+        """
         axis = event.artist.get_axes()
         ind = event.ind[0]
         x = self.branch.x[ind]
@@ -519,10 +630,14 @@ class DSS():
         self.mapselected.set_data(xto,yto)
         self.mapfig.canvas.draw()
 
-# the Bus class uses the circuit instance from the DSS COM object
-# and gets the names, bus voltages, distances from the energy meter,
-# x and y coordinates of the 'from' bus and puts them into numpy arrays
+
 class Bus:
+    """
+    Bus class uses the circuit instance from the DSS COM object
+    and gets the names, bus voltages, distances from the energy meter,
+    x and y coordinates of the 'from' bus and puts them into numpy arrays
+    """
+
     def __init__(self, circuit):
         """
         Inputs:
@@ -534,21 +649,22 @@ class Bus:
             x - array (n) - from-bus x location
             y - array (n) - from-bus y location
         """
-# n is set to the number of buses in the circuit
+
+        # n is set to the number of buses in the circuit
         n = circuit.NumBuses
 
-# make the x,y, distance, and voltage numpy arrays of length n and set
-# the vslues to all zeros
-# note:  the voltage array is an array of complex values
+        # make the x,y, distance, and voltage numpy arrays of length n and set
+        # the vslues to all zeros
+        # note:  the voltage array is an array of complex values
         x = np.zeros(n)
         y = np.zeros(n)
         distance = np.zeros(n)
-        V = np.zeros((n,3), dtype=complex)
+        V = np.zeros((n, 3), dtype=complex)
         name = np.array("                                ").repeat(n)
 
-# populate the arrays by looking at the each bus in turn from 0 to n
-# note:  by convention all arrays are zero-based in python
-        for i in range(0,n):
+        # populate the arrays by looking at the each bus in turn from 0 to n
+        # note:  by convention all arrays are zero-based in python
+        for i in range(0, n):
             bus = circuit.Buses(i)
             name[i] = bus.Name
             x[i] = bus.x
@@ -557,9 +673,10 @@ class Bus:
             v = np.array(bus.Voltages)
             nodes = np.array(bus.Nodes)
 
-# we're only interested in the first three nodes
-# (also called terminals) on the bus
-            if nodes.size > 3: nodes = nodes[0:3]
+            # we're only interested in the first three nodes
+            # (also called terminals) on the bus
+            if nodes.size > 3:
+                nodes = nodes[0:3]
             cidx = 2 * np.array(range(0, min(v.size // 2, 3)))
             V[i, nodes-1] = v[cidx] + 1j * v[cidx + 1]
         self.name = name
@@ -568,8 +685,12 @@ class Bus:
         self.y = y
         self.distance = distance
 
-# Branch class contains the branch object details
+
 class Branch:
+    """
+    Branch class contains the branch object details
+    """
+
     def __init__(self, circuit):
         """
         Inputs:
@@ -599,11 +720,11 @@ class Branch:
         distance = np.zeros(n)
         nphases = np.zeros(n)
         kvbase = np.zeros(n)
-        I = np.zeros((n,3), dtype=complex)
-        V = np.zeros((n,3), dtype=complex)
-        Vto = np.zeros((n,3), dtype=complex)
+        I = np.zeros((n, 3), dtype=complex)
+        V = np.zeros((n, 3), dtype=complex)
+        Vto = np.zeros((n, 3), dtype=complex)
         i = 0
-        for j in range(0,n):
+        for j in range(0, n):
             el = circuit.CktElements(j)
             if not re.search("^Line", el.Name):
                 continue  # only pick lines...
@@ -624,7 +745,7 @@ class Branch:
             bus1 = circuit.Buses(re.sub(r"\..*","", el.BusNames[0]))
 
             if bus1.x == 0 or bus1.y == 0:
-                continue # skip lines without proper bus coordinates
+                continue  # skip lines without proper bus coordinates
 
             busname[i] = bus1.Name
 
@@ -671,22 +792,22 @@ def pf2scalar(pf):
     """
     Scales power factor to [-2.0, 0.0], where pf=1.0 -> -1.0 and pf=0.9 -> -1.1
     """
-    return np.where(pf<0, pf, -2.0 + pf)
+    return np.where(pf < 0, pf, -2.0 + pf)
 
 
 def scalar2pf(scalar):
     """
     Recovers power factor from scaled values
     """
-    return np.where(scalar>-1.0, scalar, 2.0 + scalar)
+    return np.where(scalar > -1.0, scalar, 2.0 + scalar)
 
 
 def pf2angle(pf):
-    return np.where(pf>=0, np.arccos(pf), -1.0 * np.arccos(-pf))
+    return np.where(pf >= 0, np.arccos(pf), -1.0 * np.arccos(-pf))
 
 
 def angle2pf(angle):
-    return np.where(angle>=0, np.cos(angle), -1.0 * np.cos(-angle))
+    return np.where(angle >= 0, np.cos(angle), -1.0 * np.cos(-angle))
 
 
 def penalty2list(penalty):
@@ -736,7 +857,7 @@ def map_response(d, pvlist, hour, sec, base, threshold_violation,
         s.append(list(np.linspace(angle_lb[i], angle_ub[i], numint)))
     angles = list(itertools.product(*s))
     res = np.zeros((len(angles), len(angle_lb)+1))
-    ptr= 0
+    ptr = 0
     # solve for objective function values
     for a in angles:
         pf = angle2pf(np.array(a))

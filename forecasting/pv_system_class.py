@@ -50,7 +50,7 @@ class PVobj():
 
         # wrapper for functions forecast_ARMA and forecast_persistence
 
-        if self.forecast_method=='arma':
+        if self.forecast_method == 'arma':
             return pv_forecast_util.forecast_ARMA(self,
                                  start,
                                  end,
@@ -59,7 +59,7 @@ class PVobj():
                                  dataWindowLength,
                                  order)
 
-        elif self.forecast_method=='persistence':
+        elif self.forecast_method == 'persistence':
             return pv_forecast_util.forecast_persistence(self,
                                         start,
                                         end,

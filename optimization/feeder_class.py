@@ -210,6 +210,7 @@ class Feeder(object):
                 self.loads[load_name].Qmult = Qmult
 
                 self.update_loads()  # set load in OpenDSS
+                self.update_q_loads()  # set reactive power load in OpenDSS
 
                 load_p_fc[load_name] = Pmult
                 load_q_fc[load_name] = Qmult
@@ -221,6 +222,12 @@ class Feeder(object):
         """
         for bus in self.loads.keys():
             self.DSS.set_load(bus, self.loads[bus].Pmult)
+
+    def update_q_loads(self):
+        """ Updates reactive power component of load in DSS for each bus
+        """
+        for bus in self.loads.keys():
+            self.DSS.set_load(bus, self.loads[bus].Qmult)
 
     def update_power_factors(self, pvlist, pv_forecast, load_forecast, hour, sec, stepsize, numsteps, options):
         """

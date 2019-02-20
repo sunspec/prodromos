@@ -21,7 +21,7 @@ class Load:
     """
 
     def __init__(self, name, phases=1, kW=None, kvar=None, kV=None, status='variable', model=5, Vmaxpu=1.3, Vminpu=0.7,
-                 enabled=True, bus1='b_1.1', duty='loadprofile1', vals=None):
+                 enabled=True, bus1='b_1.1', duty='loadprofile1', p_mult=None, q_mult=None):
         """
         Replicating parameters from OpenDSS Loads, e.g.,
         New "Load.Load138" phases=1 kW=2.670415479 kvar=0.302451287 kV=7.199557857 status=variable
@@ -31,6 +31,10 @@ class Load:
         :param kW: power
         :param kvar: reactive power
         :param vals: multiplier on the loadshape
+
+        :param p_mult: active power gain on the loadshape
+        :param q_mult: reactive power gain on the loadshape
+
         :param phases: number of phases
 
         """
@@ -46,8 +50,8 @@ class Load:
         self.enabled = enabled
         self.bus1 = bus1
         self.duty = duty
-        self.Pmult = vals
-        self.Qmult = None
+        self.Pmult = p_mult
+        self.Qmult = q_mult
         self.phase = None  # [0] = A, [1] = B, [2] = C, [0, 1, 2] = ABC
         self.determine_load_phases()
 
@@ -390,10 +394,11 @@ class DSS(object):
             profile = self.circuit.ActiveElement.Properties('duty').val
             self.circuit.Loadshapes.Name = profile
             Pmult = np.array(self.circuit.Loadshapes.Pmult)
+            Qmult = np.array(self.circuit.Loadshapes.Qmult)
 
             # instantiate the Load object with the discovered parameters
             loads[name] = Load(name, phases, kW, kvar, kV, status, model, Vmaxpu, Vminpu, enabled, bus1,
-                               duty=profile, vals=Pmult)
+                               duty=profile, p_mult=Pmult, q_mult=Qmult)
 
             p = self.circuit.Loads.Next  # advance pointer
         return loads

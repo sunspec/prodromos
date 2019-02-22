@@ -57,7 +57,7 @@ LOADS = {'load142': {'Bus': 'B09', 'OpenDSSname': 'Load.Load142', 'Phasors':  ['
          'load135': {'Bus': 'B10', 'OpenDSSname': 'Load.Load135', 'Phasors': ['795D00092-01'], 'phase': [2],
                     'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.],
                      'init_load': 0, 'init_q_load': 0},
-         'load20': {'Bus': 'B04', 'OpenDSSname': 'Load.Load20', 'Phasors': ['796D00097-01'], 'phase': [0, 1, 2],
+         'load20': {'Bus': 'B04', 'OpenDSSname': 'Load.Load20', 'Phasors': ['796D00097-03'], 'phase': [0, 1, 2],
                     'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.],
                     'init_load': 0, 'init_q_load': 0},
          'PV1': {'Bus': 'B12', 'OpenDSSname': 'PVSystem.PVSy1', 'Phasors': ['794D00050-02'], 'phase': [0, 1, 2],
@@ -209,8 +209,8 @@ class Feeder(object):
                 self.loads[load_name].Pmult = Pmult
                 self.loads[load_name].Qmult = Qmult
 
-                self.update_loads()  # set load in OpenDSS
-                self.update_q_loads()  # set reactive power load in OpenDSS
+                # These loads are updated during optimization now
+                # self.update_loads()  # set load in OpenDSS
 
                 load_p_fc[load_name] = Pmult
                 load_q_fc[load_name] = Qmult
@@ -221,15 +221,9 @@ class Feeder(object):
         """ Updates load in DSS for each bus
         """
         for bus in self.loads.keys():
-            self.DSS.set_load(bus, self.loads[bus].Pmult)
+            self.DSS.set_load(bus, pmult=self.loads[bus].Pmult, qmult=self.loads[bus].Qmult)
 
-    def update_q_loads(self):
-        """ Updates reactive power component of load in DSS for each bus
-        """
-        for bus in self.loads.keys():
-            self.DSS.set_load(bus, self.loads[bus].Qmult)
-
-    def update_power_factors(self, pvlist, pv_forecast, load_forecast, hour, sec, stepsize, numsteps, options):
+    def update_power_factors(self, pvlist, pv_forecast, p_forecast, q_forecast, hour, sec, stepsize, numsteps, options):
         """
         Determines new power factor settings.
         
@@ -240,10 +234,14 @@ class Feeder(object):
                 {derid, forecast} for each PV system on the Feeder.
                 derid: (str)
                 forecast: numeric
-            load_forecast: dict
+            p_forecast: dict
                 {loadid, forecast} for each bus on the Feeder.
                 loadid: str
-                forecast: numeric
+                forecast: numeric np array
+            q_forecast: dict
+                {loadid, forecast} for each bus on the Feeder.
+                loadid: str
+                forecast: numeric np array
             hour: int
             sec: int
             stepsize: str
@@ -266,8 +264,8 @@ class Feeder(object):
             pf_ub[pv] = self.pv[pv].pf_max
             pf_lb[pv] = self.pv[pv].pf_min
 
-        change, new_pf = self.DSS.update_power_factors(curr_pf, pv_forecast,
-                                                       load_forecast,
+        change, new_pf, opt_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
+                                                       p_forecast, q_forecast,
                                                        pvlist, hour, sec,
                                                        pf_lb, pf_ub, stepsize,
                                                        numsteps, options)
@@ -281,5 +279,5 @@ class Feeder(object):
         print('new_pf: %s' % new_pf)
         print('PSO solution, pf: %s' % pf)
 
-        return pf
+        return pf, opt_obj
 

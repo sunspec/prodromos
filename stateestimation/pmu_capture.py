@@ -22,7 +22,7 @@ LOADS = {'Load142': {'Bus': 'B09', 'OpenDSSname': 'Load.Load142', 'Phasors':  ['
                     'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.]},
          'Load135': {'Bus': 'B10', 'OpenDSSname': 'Load.Load135', 'Phasors': ['795D00092-01'], 'phase': [2],
                     'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.]},
-         'Load20': {'Bus': 'B04', 'OpenDSSname': 'Load.Load20', 'Phasors': ['796D00097-01'], 'phase': [0, 1, 2],
+         'Load20': {'Bus': 'B04', 'OpenDSSname': 'Load.Load20', 'Phasors': ['796D00097-03'], 'phase': [0, 1, 2],
                     'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.]},
          'PV1': {'Bus': 'B12', 'OpenDSSname': 'PVSystem.PVSy1', 'Phasors': ['794D00050-02'], 'phase': [0, 1, 2],
                  'va_mag': [0., 0., 0.], 'va_deg': [0., 0., 0.], 'P': [0., 0., 0.], 'Q': [0., 0., 0.]},
@@ -119,7 +119,7 @@ def fill_dict_from_dataframes(dFrame=None, LOADS=None):
 
                     for phase in phases:
                         if len(phases) == 3:
-                            LOADS[bus]['va_mag'][phase] = ph_val / 3.
+                            LOADS[bus]['va_mag'][phase] = ph_val
                             LOADS[bus]['va_deg'][phase] = ph_angle
                         else:
                             LOADS[bus]['va_mag'][phase] = ph_val

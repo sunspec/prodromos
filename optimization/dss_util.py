@@ -79,20 +79,24 @@ class Load:
             load: numeric, vector of load multipliers
         """
 
-        engine = win32com.client.Dispatch("OpenDSSEngine.DSS")
-        # engine.Start("0")
-        circuit = engine.ActiveCircuit
-        circuit.Loads.Name = self.name
+        # Redacted
+        pass
 
-        self.kW = circuit.Loads.kW
-        self.kvar = circuit.Loads.kvar
+        # engine = win32com.client.Dispatch("OpenDSSEngine.DSS")
+        # # engine.Start("0")
+        # circuit = engine.ActiveCircuit
+        # circuit.Loads.Name = self.name
+        #
+        # self.kW = circuit.Loads.kW
+        # self.kvar = circuit.Loads.kvar
+        #
+        # profile = circuit.ActiveElement.Properties('duty').val
+        # circuit.Loadshapes.Name = profile
+        # self.Pmult = np.array(circuit.Loadshapes.Pmult)
+        # self.Qmult = np.array(circuit.Loadshapes.Pmult)
 
-        profile = circuit.ActiveElement.Properties('duty').val
-        circuit.Loadshapes.Name = profile
-        self.Pmult = np.array(circuit.Loadshapes.Pmult)
 
-
-class VVar_optim:
+class PFOptim:
 
     def __init__(self, penalty={'violation': 1.0, 'deviation': 1.0, 'power_factor': 0.05},
                        threshold={'violation': 0.05, 'accept': 0.02, 'object': 0.005}, debug=False, swarmsize=20,
@@ -181,7 +185,7 @@ class DSS(object):
         # self.text.Command = "Buscoords Buscoords.dat"   # load in bus coordinates
         self.populate_results()
 
-    def run(self, power_factors, pvlist, hour, sec, pv_profile, load_profile,
+    def run(self, power_factors, pvlist, hour, sec, pv_profile, p_profile, q_profile,
                     periods=1, stepsize='15m'):
         """
         Solves the circuit at time hour:sec, using the power factors, pv output and
@@ -198,7 +202,9 @@ class DSS(object):
         sec : float
         pv_profile : dict
             key is OpenDSS PV system name, value is sequence of power multipliers
-        load_profile : dict
+        p_profile : dict
+            key is OpenDSS load name, value is sequence of load multipliers
+        q_profile : dict
             key is OpenDSS load name, value is sequence of load multipliers
         periods : integer, default 1
             number of time periods to step through
@@ -229,8 +235,10 @@ class DSS(object):
         V = []
         # minterval = stepsize.strip('m')
         # set new load values
-        for ld in load_profile.keys():
-            self.set_load(ld, load_profile[ld])
+        for ld in p_profile.keys():
+            self.set_load(ld, pmult=p_profile[ld])
+        for ld in q_profile.keys():
+            self.set_load(ld, qmult=q_profile[ld])
         for (pv, pf) in zip(pvlist, power_factors):
             self.set_pv(pv, pv_profile[pv], pf)
 
@@ -261,14 +269,15 @@ class DSS(object):
         """
         power_factors = angle2pf(pf_angles)
         if not all([kw in kwargs for kw in ['pvlist', 'hour', 'sec',
-                                            'pv_profile', 'load_profile',
+                                            'pv_profile', 'p_profile', 'q_profile',
                                             'stepsize', 'options']]):
             raise ValueError('kwargs for pf_opt_obj incomplete')
         pvlist = kwargs['pvlist']
         hour = kwargs['hour']
         sec = kwargs['sec']
         pv_profile = kwargs['pv_profile']
-        load_profile = kwargs['load_profile']
+        p_profile = kwargs['p_profile']
+        q_profile = kwargs['q_profile']
         stepsize = kwargs['stepsize']
         if 'base' in kwargs:
             base_voltage = kwargs['base']
@@ -284,13 +293,13 @@ class DSS(object):
         penalty = penalty2list(options.penalty)
     
         V = self.run(power_factors, pvlist, hour, sec,
-                     pv_profile=pv_profile, load_profile=load_profile,
+                     pv_profile=pv_profile, p_profile=p_profile, q_profile=q_profile,
                      periods=periods, stepsize=stepsize)
     
         return calc_obj(V, penalty, alpha, base_voltage, power_factors)
 
     def optimize_pf(self, hour, sec, pvlist, pf_lb, pf_ub, pv_profile,
-                    load_profile, stepsize, options, periods=1,
+                    p_profile, q_profile, stepsize, options, periods=1,
                     base_voltage=1.0):
         """
         Returns optimized power factor for each PV system
@@ -298,20 +307,18 @@ class DSS(object):
         # convert lb and ub to angles
         lb = [pf2angle(pf_lb[pv]) for pv in pvlist]
         ub = [pf2angle(pf_ub[pv]) for pv in pvlist]
-        xopt, fopt = pso(self._ps_pf_opt, lb, ub, kwargs={'dssobj': self,
-            'hour': hour, 'sec': sec, 'pvlist': pvlist,
-            'pv_profile': pv_profile,
-            'load_profile': load_profile, 'base': base_voltage,
-            'options': options, 'periods': periods, 'stepsize': stepsize},
-            debug=options.debug, swarmsize=options.swarmsize,
-            maxiter=options.maxiter, minstep=options.minstep,
-            minfunc=options.minfunc)
+
+        # Run particle swarm optimization routine
+        xopt, fopt = pso(self._ps_pf_opt, lb, ub, kwargs={'dssobj': self, 'hour': hour, 'sec': sec, 'pvlist': pvlist,
+            'pv_profile': pv_profile, 'p_profile': p_profile, 'q_profile': q_profile, 'base': base_voltage,
+            'options': options, 'periods': periods, 'stepsize': stepsize}, debug=options.debug,
+            swarmsize=options.swarmsize,  maxiter=options.maxiter, minstep=options.minstep, minfunc=options.minfunc)
+
         pf = angle2pf(xopt)
         return pf, fopt
 
-    def update_power_factors(self, curr_pf, pv_forecast, load_forecast,
-                             pvlist, hour, sec,
-                             pf_lb, pf_ub, stepsize, numsteps,
+    def update_power_factors(self, curr_pf, pv_forecast, p_forecast, q_forecast,
+                             pvlist, hour, sec, pf_lb, pf_ub, stepsize, numsteps,
                              options, base=1.0):
         """
         Updates power factors.
@@ -321,8 +328,14 @@ class DSS(object):
                 power factor for each PV system
             pv_forecast: dict
                 {pvid, forecast} where forecast is a time series
-            load_forecast: dict
-                {loadid, forecast} where forecast is a time series
+            p_forecast: dict
+                {loadid, forecast} for each bus on the Feeder.
+                loadid: str
+                forecast: numeric np array
+            q_forecast: dict
+                {loadid, forecast} for each bus on the Feeder.
+                loadid: str
+                forecast: numeric np array
             pvlist: list
                 derid for PV systems to consider for power factor changes
             hour: int
@@ -337,9 +350,12 @@ class DSS(object):
         # first solve for voltage using current settings
         change_pf = False
         power_factors = [curr_pf[pv] for pv in pvlist]
+        opt_obj = 'No update'
         # numsteps = len(pv_fc[list(pv_fc.keys())[0]])
+
+        # Calculate a starting value for the objective function. If change is small, don't change PFs.
         V = self.run(power_factors, pvlist, hour, sec,
-                     pv_profile=pv_forecast, load_profile=load_forecast,
+                     pv_profile=pv_forecast, p_profile=p_forecast, q_profile=q_forecast,
                      periods=numsteps, stepsize=stepsize)
     
         if any([voltage_violation(v, options.threshold['accept'], base) for v in V]):
@@ -350,16 +366,15 @@ class DSS(object):
             print('--- current obj value {}'.format(curr_obj))
             # previous settings are not good, find optimal settings
             opt_pf, opt_obj = self.optimize_pf(hour, sec, pvlist, pf_lb, pf_ub,
-                                          pv_profile=pv_forecast,
-                                          load_profile=load_forecast,
-                                          periods=numsteps, stepsize=stepsize,
-                                          options=options, base_voltage=base)
+                                              pv_profile=pv_forecast,
+                                              p_profile=p_forecast, q_profile=q_forecast,
+                                              periods=numsteps, stepsize=stepsize,
+                                              options=options, base_voltage=base)
             opt_pf = {pv: pf for (pv, pf) in zip(pvlist, opt_pf)}
             if options.debug:
                 print("--- optimized obj value {}".format(opt_obj))
                 print("--- optimized power factors {}.".format(opt_pf))
-            if ((curr_obj > opt_obj) and
-                (curr_obj - opt_obj) < options.threshold['object']):
+            if (curr_obj > opt_obj) and (curr_obj - opt_obj) < options.threshold['object']:
                 # change pf
                 print('--- starting PF {}: obj value {}'.format(curr_pf,
                       curr_obj))
@@ -369,7 +384,7 @@ class DSS(object):
                 change_pf = True
             else:
                 print("--- not changing PF, couldn't improve on objective")
-        return change_pf, power_factors
+        return change_pf, power_factors, opt_obj
 
     def get_loads(self):
         """
@@ -403,18 +418,40 @@ class DSS(object):
             p = self.circuit.Loads.Next  # advance pointer
         return loads
 
-    def _edit_loadshape(self, name, val):
+    def _edit_loadshape(self, name, pmult, qmult, pv):
         """ Writes load into a loadshape's Pmult
         """
-
         self.circuit.Loadshapes.Name = name
-        Pmult = np.array(self.circuit.Loadshapes.Pmult)
-        K = len(val)
-        Pmult[0:K] = val
-        Pmult = [float(p) for p in Pmult]
-        self.circuit.Loadshapes.Pmult = tuple(Pmult)
+        try:
+            Pmult = np.array(self.circuit.Loadshapes.Pmult)
+        except AttributeError:
+            print('Could not find Pmult for %s' % name)
+        try:
+            Qmult = np.array(self.circuit.Loadshapes.Qmult)
+        except AttributeError:
+            print('Could not find Qmult for %s' % name)
+        try:
+            mult = np.array(self.circuit.Loadshapes.Pmult)
+        except AttributeError:
+            print('Could not find pv Pmult for %s' % name)
 
-    def set_load(self, bus, load):
+        if pmult is not None:
+            K = len(pmult)
+            Pmult[0:K] = pmult
+            Pmult = [float(p) for p in Pmult]
+            self.circuit.Loadshapes.Pmult = tuple(Pmult)
+        if qmult is not None:
+            K = len(qmult)
+            Qmult[0:K] = qmult
+            Qmult = [float(q) for q in Qmult]
+            self.circuit.Loadshapes.Qmult = tuple(Qmult)
+        if pv is not None:
+            K = len(pv)
+            mult[0:K] = pv
+            mult = [float(q) for q in mult]
+            self.circuit.Loadshapes.Pmult = tuple(mult)
+
+    def set_load(self, bus, pmult=None, qmult=None, pv=None):
         """
         Replaces the beginning of the loadshape for each bus with the values
         in load
@@ -425,7 +462,7 @@ class DSS(object):
         """
         self.circuit.Loads.Name = bus
         profile = self.circuit.ActiveElement.Properties('duty').val
-        self._edit_loadshape(profile, load)
+        self._edit_loadshape(profile, pmult, qmult, pv)
 
     def set_pv(self, name, val, pf):
         """
@@ -440,7 +477,7 @@ class DSS(object):
         self.circuit.ActiveElement.Properties('PF').val = pf
         # set power profile values
         profile = self.circuit.ActiveElement.Properties('duty').val
-        self._edit_loadshape(profile, val)
+        self._edit_loadshape(profile, pmult=None, qmult=None, pv=val)
 
     def populate_results(self):
         """

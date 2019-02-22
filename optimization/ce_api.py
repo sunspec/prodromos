@@ -48,7 +48,7 @@ class CE_API(object):
             setpoint = ({
                          "der_number": der_id,  # e.g., "sunpower2202"
                          "opendss_name": "some name 1",
-                         "reactive_power_target": "unknown",
+                         "reactive_power_target": -2000,
                          "pf_setpoint_magnitude": pf_info["pf"],
                          "excitation": pf_info["excitation"]
                         })

@@ -16,7 +16,6 @@ import numpy as np
 import time
 import os
 import math
-import csv
 
 USMtn = pytz.timezone('US/Mountain')
 
@@ -28,7 +27,7 @@ api = CE_API(username=username, password=password)
 
 # Create dictionary of all PV systems and associated forecast information
 pvdict = {}
-use_surrogates = True
+use_surrogates = False
 if use_surrogates:
     pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=1900, ac_capacity=3000, lat=35.05, lon=-106.54, alt=1657,
                                    tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
@@ -46,34 +45,31 @@ if use_surrogates:
                             tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                             surrogateid='sunpower2201', forecast_method='persistence')
 else:
-    pvdict['pvsy1'] = PVobj('1 MW Plant', dc_capacity=1000, ac_capacity=1000, lat=35.05, lon=-106.54, alt=1657,
+    pvdict['pvsy1'] = PVobj('epri3', dc_capacity=1000e3, ac_capacity=1000e3, lat=35.05, lon=-106.54, alt=1657,
                             tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                             forecast_method='persistence')
 
-    pvdict['pvsy2'] = PVobj('10 MW Plant', dc_capacity=10000, ac_capacity=10000, lat=35.05, lon=-106.54, alt=1657,
+    pvdict['pvsy2'] = PVobj('epri2', dc_capacity=10000e3, ac_capacity=10000e3, lat=35.05, lon=-106.54, alt=1657,
                             tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                             forecast_method='persistence')
 
-    pvdict['pvsy3'] = PVobj('258 kW Plant', dc_capacity=258, ac_capacity=258, lat=35.05, lon=-106.54, alt=1657,
+    pvdict['pvsy3'] = PVobj('epri1', dc_capacity=258e3, ac_capacity=258e3, lat=35.05, lon=-106.54, alt=1657,
                             tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                             forecast_method='persistence')
 
-dss_to_phil_map = {'pvsy1': 'epri3', 'pvsy2': 'epri2', 'pvsy3': 'epri1'}
+dss_to_phil_map = {'pvsy1': 'epri1', 'pvsy2': 'epri2', 'pvsy3': 'epri3'}
 
-pvlist = list(pvdict.keys())
+cwd = os.getcwd()
 
 # Setup feeder object which points to the local OpenDSS time series simulation
-feeder = Feeder(filename=os.getcwd() + "\\PNM_reduced_timeseries\\Master.DSS",
-                pv=pvdict)
+feeder = Feeder(filename=cwd + "\\PNM_reduced_timeseries\\Master.DSS", pv=pvdict)
+pvlist = feeder.pv_on_feeder
 
-derlist = feeder.pv_on_feeder
+derlist = feeder.pv_on_feeder  # the controllable DER on the feeder
 loadlist = feeder.DSS.circuit.Loads.AllNames
 
 if not (set(derlist) <= set(pvlist)):
     raise ValueError('OpenDSS PV system list not included in pvlist')
-
-# Assume DER devices start at unity PF
-curr_pf = {pv: 1.0 for pv in pvlist}
 
 # stepsize hardcoded at 5m for now because that's the resolution of the PV forecasts
 stepsize = '5m'
@@ -82,10 +78,14 @@ stepsize = '5m'
 periods = 3
 
 # Results dataset
-results_filename = os.getcwd() + ' Optimization %s.csv' % time.time()
+data_set_start_time = time.time()
+results_filename = cwd + '\\Optimization %s.csv' % data_set_start_time
 csvfile = open(results_filename, 'x')
-csvfile.write('Time (s), Power Factor DER 1, Power Factor DER 2, Power Factor DER 3, '
+csvfile.write('Time (s), Weighting 1 (W1), Weighting 2 (W2), Weighting 3 (W3), '
+              'Violation Threshold, Acceptance Threshold, Objective Function Threshold, '
+              'Power Factor DER 1, Power Factor DER 2, Power Factor DER 3, '
               'Reactive Power DER 1 (var), Reactive Power DER 2 (var), Reactive Power DER 3 (var), '
+              'Objective Function with Prior PFs, PF Change Bool, '
               'Optimization Function, PV Forecast, Power Forecast, Reactive Power Forecast\n')
 csvfile.close()
 
@@ -101,8 +101,8 @@ for opt_loop in range(n_iter):
     # Get the new forecast from the Connected Energy system for each of the PV systems in the feeder.pv_on_feeder
     feeder.update_pv_forecasts(api=api)
     # scale PV forecasts from W to p.u.
-    pv_forecast = {pv: feeder.pv_forecasts[pv].values[:periods] * 1. / pvdict[pv].ac_capacity for pv in feeder.pv_on_feeder}
-    # print('pv_forecast: %s' % pv_forecast)
+    pv_forecast = {pv: feeder.pv_forecasts[pv].values[:periods] / pvdict[pv].ac_capacity for pv in feeder.pv_on_feeder}
+    print('pv_forecast: %s' % pv_forecast)
 
     ''' Update Load information in the OpenDSS simulations '''
     # Get the new load data from the state estimator.  Assume persistence and forecast the same value into the future
@@ -110,26 +110,27 @@ for opt_loop in range(n_iter):
     print('p_forecast: %s' % p_forecast)
     print('q_forecast: %s' % q_forecast)
 
-    ''' control and options for optimization '''
-    penalty = {'violation': 1.0, 'deviation': 1.0, 'power_factor': 0.05}
+    ''' Control and options for optimization '''
+    penalty = {'violation': 1.0, 'deviation': 2.0, 'power_factor': 0.05}
 
     # Voltage violation is at ANSI Range A
     # Optimization will not run if all voltages are within 0.2% of Vnom
     # PFs will not change if the new PF do not improve objective function my 0.5%
-    threshold = {'violation': 0.05, 'accept': 0.002, 'object': 0.005}
+    threshold = {'violation': 0.05, 'accept': 0.002, 'object': 0.001}
     debug = True
-    swarmsize = 10*len(pvlist)
+    swarmsize = 40
     maxiter = 10
     minstep = 0.001
     minfunc = 1e-6
 
     options = PFOptim(penalty=penalty, threshold=threshold, debug=debug,
-                         swarmsize=swarmsize, maxiter=maxiter, minstep=minstep,
-                         minfunc=minfunc)
+                      swarmsize=swarmsize, maxiter=maxiter, minstep=minstep,
+                      minfunc=minfunc)
 
-    new_pf, opt_obj = feeder.update_power_factors(pvlist, pv_forecast, p_forecast, q_forecast,
-                                         hour=0, sec=0, stepsize=stepsize,
-                                         numsteps=periods, options=options)
+    new_pf, prior_pf, opt_obj, prior_obj, change = feeder.update_power_factors(pvlist, pv_forecast,
+                                                                               p_forecast, q_forecast, hour=0,
+                                                                               sec=0, stepsize=stepsize,
+                                                                               numsteps=periods, options=options)
 
     print('The optimal power factors are %s' % new_pf)
 
@@ -145,10 +146,12 @@ for opt_loop in range(n_iter):
     for pv_name in new_pf.keys():
         if new_pf[pv_name] >= 0:  # EPRI simulator convention
             excitation = "injectingQ"
-            new_q_values[pv_name] = np.arccos(new_pf[pv_name])
+            # the expected reactive power based on the forecast VA level of the DERs
+            new_q_values[pv_name] = np.arccos(new_pf[pv_name])*pv_forecast[pv_name][0]*pvdict[pv_name].ac_capacity
         else:
             excitation = "absorbingQ"
-            new_q_values[pv_name] = -1.0 * np.arccos(-new_pf[pv_name])
+            # the expected reactive power based on the forecast VA level of the DERs
+            new_q_values[pv_name] = -np.arccos(-new_pf[pv_name])*pv_forecast[pv_name][0]*pvdict[pv_name].ac_capacity
         der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
         pv_names.append(pv_name)
     print('The optimal reactive power values are %s' % new_q_values)
@@ -156,17 +159,33 @@ for opt_loop in range(n_iter):
     print('DER dictionary to send to CE\'s API: %s' % der)
     api.set_pf(der=der)
 
+    # store detailed results information in individual files for replay debugging
+    step_time = time.time() - starttime
+    # raw_dir = cwd + '\\Raw Data %s\\' % data_set_start_time
+    # if not os.path.isdir(raw_dir):
+    #     os.mkdir(raw_dir)
+    # raw_results_filename = cwd + '\\Raw Data %s\\Optimization %s.txt' % (data_set_start_time, step_time)
+    # print('Writing raw data to %s' % raw_results_filename)
+    # csvfile_raw = open(raw_results_filename, 'x')
+    # csvfile_raw.write('pv_forecast = %s\n' % pv_forecast)
+    # csvfile_raw.write('p_forecast = %s\n' % p_forecast)
+    # csvfile_raw.write('q_forecast = %s\n' % q_forecast)
+    # csvfile_raw.write('prior_pf = %s\n' % prior_pf)
+    # csvfile_raw.write('new_pf = %s\n' % new_pf)
+    # csvfile_raw.write('new_q_values = %s\n' % new_q_values)
+    # csvfile_raw.close()
+
     # Write data from this optimization loop
-    results = '%s, %0.5f, %0.5f, %0.5f, %0.2f, %0.2f, %0.2f, %s, %s, %s, %s \n' % (time.time() - starttime,
-                                                                                    new_pf[pv_names[0]],
-                                                                                    new_pf[pv_names[1]],
-                                                                                    new_pf[pv_names[2]],
-                                                                                    new_q_values[pv_names[0]],
-                                                                                    new_q_values[pv_names[1]],
-                                                                                    new_q_values[pv_names[2]],
-                                                                                    opt_obj, pv_forecast.values(),
-                                                                                    p_forecast.values(),
-                                                                                   q_forecast.values())
+    results = '%s, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, ' \
+              '%s, %s, %s, %s, %s, %s, %s, %s, %s \n' % (step_time, penalty['violation'],
+                                                          penalty['deviation'], penalty['power_factor'],
+                                                          threshold['violation'], threshold['accept'],
+                                                          threshold['object'], new_pf[pv_names[0]],
+                                                          new_pf[pv_names[1]], new_pf[pv_names[2]],
+                                                          new_q_values[pv_names[0]], new_q_values[pv_names[1]],
+                                                          new_q_values[pv_names[2]], prior_obj, change,
+                                                          opt_obj, pv_forecast,
+                                                          p_forecast, q_forecast)
 
     # open/close results file each time so the latest data is stored even with a crash
     csvfile = open(results_filename, 'a')

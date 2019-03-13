@@ -99,7 +99,7 @@ class Load:
 class PFOptim:
 
     def __init__(self, penalty={'violation': 1.0, 'deviation': 1.0, 'power_factor': 0.05},
-                       threshold={'violation': 0.05, 'accept': 0.02, 'object': 0.005}, debug=False, swarmsize=20,
+                       threshold={'violation': 0.05, 'accept': 0.02, 'object': 0.005}, debug=False, swarmsize=50,
                        maxiter=20, minstep=0.001, minfunc=1e-6):
         """
         Parameters
@@ -217,9 +217,10 @@ class DSS(object):
             len(V) = periods, each entry is a vector of bus voltage
         """
     
-        npts = [len(pv_profile[pv])<periods for pv in pvlist]
-        if any(npts):
-            raise ValueError("number of forecast points is less than number "
+        npts_failure = [len(pv_profile[pv]) < periods for pv in pvlist]
+        if any(npts_failure):
+            print('pv_profiles: %s' % pv_profile)
+            raise ValueError("Number of forecast points is less than number "
                              "of time periods")
     
         # initialize DSS model
@@ -295,8 +296,14 @@ class DSS(object):
         V = self.run(power_factors, pvlist, hour, sec,
                      pv_profile=pv_profile, p_profile=p_profile, q_profile=q_profile,
                      periods=periods, stepsize=stepsize)
+
+        curr_obj = calc_obj(V, penalty, alpha, base_voltage, power_factors)
+
+        # A lot of prints!
+        # print('PSO Solution for PFs: %s, objective: %s' % (power_factors, curr_obj))
+        # print('Voltages: %s' % V)
     
-        return calc_obj(V, penalty, alpha, base_voltage, power_factors)
+        return curr_obj
 
     def optimize_pf(self, hour, sec, pvlist, pf_lb, pf_ub, pv_profile,
                     p_profile, q_profile, stepsize, options, periods=1,
@@ -350,16 +357,20 @@ class DSS(object):
         # first solve for voltage using current settings
         change_pf = False
         power_factors = [curr_pf[pv] for pv in pvlist]
+        power_factor_dict = curr_pf  # create pf solution dictionary
         opt_obj = 'No update'
+        prior_obj = 'Unknown - voltages within deviation target'
         # numsteps = len(pv_fc[list(pv_fc.keys())[0]])
 
         # Calculate a starting value for the objective function. If change is small, don't change PFs.
         V = self.run(power_factors, pvlist, hour, sec,
                      pv_profile=pv_forecast, p_profile=p_forecast, q_profile=q_forecast,
                      periods=numsteps, stepsize=stepsize)
+        # print('Voltages from Prior Solution: %s' % V)
     
         if any([voltage_violation(v, options.threshold['accept'], base) for v in V]):
             print('--- voltage deviation outside target')
+            print('--- PFs going into curr_obj solution: %s' % power_factors)
             curr_obj = calc_obj(V, penalty2list(options.penalty), 
                                 options.threshold['violation'], base,
                                 power_factors)
@@ -370,21 +381,34 @@ class DSS(object):
                                               p_profile=p_forecast, q_profile=q_forecast,
                                               periods=numsteps, stepsize=stepsize,
                                               options=options, base_voltage=base)
-            opt_pf = {pv: pf for (pv, pf) in zip(pvlist, opt_pf)}
+
             if options.debug:
                 print("--- optimized obj value {}".format(opt_obj))
                 print("--- optimized power factors {}.".format(opt_pf))
-            if (curr_obj > opt_obj) and (curr_obj - opt_obj) < options.threshold['object']:
+                print("--- curr_obj - opt_obj: %s" % (curr_obj - opt_obj))
+                print("--- options.threshold['object']: %s" % (options.threshold['object']))
+                print("--- Update PF Logic: %s and %s" % ((curr_obj > opt_obj),
+                                                         (curr_obj - opt_obj) > options.threshold['object']))
+            if (curr_obj > opt_obj) and (curr_obj - opt_obj) > options.threshold['object']:
                 # change pf
-                print('--- starting PF {}: obj value {}'.format(curr_pf,
-                      curr_obj))
-                print('--- change PF to {}: obj value {}'.format(opt_pf,
-                      opt_obj))
-                power_factors = opt_pf
+                print('--- starting PF {}: obj value {}'.format(curr_pf, curr_obj))
+                print('--- change PF to {}: obj value {}'.format(opt_pf, opt_obj))
+                power_factor_dict = {pv: pf for (pv, pf) in zip(pvlist, opt_pf)}  # create pf solution dictionary
                 change_pf = True
             else:
                 print("--- not changing PF, couldn't improve on objective")
-        return change_pf, power_factors, opt_obj
+            prior_obj = curr_obj
+
+        final_V = self.run([power_factor_dict[pv] for pv in pvlist], pvlist, hour, sec, pv_profile=pv_forecast,
+                           p_profile=p_forecast, q_profile=q_forecast, periods=numsteps, stepsize=stepsize)
+
+        final_obj = calc_obj(final_V, penalty2list(options.penalty), options.threshold['violation'], base,
+                             power_factors)
+
+        # print('Voltages from Optimal Solution: %s' % final_V)
+        print('curr_obj from Optimal Solution: %s' % final_obj)
+
+        return change_pf, power_factor_dict, opt_obj, prior_obj
 
     def get_loads(self):
         """
@@ -775,7 +799,9 @@ class Branch:
             busnameto[i] = bus2.Name
             xto[i] = bus2.x
             yto[i] = bus2.y
-            if bus2.x == 0 or bus2.y == 0: continue # skip lines without proper bus coordinates
+            if bus2.x == 0 or bus2.y == 0:
+                continue  # skip lines without proper bus coordinates
+
             distance[i] = bus2.Distance
             v = np.array(bus2.Voltages)
             nodes = np.array(bus2.Nodes)

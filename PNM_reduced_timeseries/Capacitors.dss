@@ -1,6 +1,11 @@
-New "Capacitor.Capa1" phases=3 kv=12.47 kvar=[ 1800] bus1=b_7 bus2=b_7.0.0.0
-New "CapControl.CapC1" terminal=1 type=kvar ONsetting=750 OFFsetting=-1600 Delay=30 DeadTime=30 DelayOFF=90 element=Line.Line149 capacitor=Capa1
+New "Capacitor.Capa1" phases=3 kv=12.47 kvar=[ 1800] bus1=b_7 bus2=b_7.0.0.0 
 
-!For the basecase, capacitor 2 should be off
-New "Capacitor.Capa2" phases=3 kv=12.47 kvar=[ 1800] bus1=b_3 bus2=b_3.0.0.0
-New "CapControl.CapC2" terminal=1 type=kvar ONsetting=750 OFFsetting=-1600 Delay=60 DeadTime=60 DelayOFF=60 element=Line.Line149 capacitor=Capa2
+
+! New "CapControl.CapC1" terminal=1 type=kvar ONsetting=750 OFFsetting=-1600 Delay=30 DeadTime=30 DelayOFF=90 element=Line.Line149 capacitor=Capa1
+
+
+
+! New "Capacitor.Capa2" phases=3 kv=12.47 kvar=[ 1800] bus1=b_3 bus2=b_3.0.0.0
+
+
+! New "CapControl.CapC2" terminal=1 type=kvar ONsetting=750 OFFsetting=-1600 Delay=60 DeadTime=60 DelayOFF=60 element=Line.Line149 capacitor=Capa2

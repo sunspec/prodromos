@@ -105,6 +105,7 @@ class Feeder(object):
         
         Returns: pandas Series
         """
+        print('Getting Forecast for derid: %s' % derid)
         return api.get_forecasts([derid])[derid]
 
     def update_pv_forecasts(self, api, debug=False):
@@ -223,7 +224,8 @@ class Feeder(object):
         for bus in self.loads.keys():
             self.DSS.set_load(bus, pmult=self.loads[bus].Pmult, qmult=self.loads[bus].Qmult)
 
-    def update_power_factors(self, pvlist, pv_forecast, p_forecast, q_forecast, hour, sec, stepsize, numsteps, options):
+    def update_power_factors(self, pvlist, pv_forecast, p_forecast, q_forecast, hour, sec, stepsize, numsteps, options,
+                             prior_pf=None):
         """
         Determines new power factor settings.
         
@@ -250,34 +252,46 @@ class Feeder(object):
             numsteps: int
                 number of intervals to consider in power flow calculation
             options: VVar_opt
+            prior_pf: dict
+                optional parameter that can instantiate the PSO with a different starting prior PF solution
+                for debugging
+                {'pvsy1': -0.9989673952629021, 'pvsy2': -0.9908374137943107, 'pvsy3': 0.9994203489618271}
 
         Returns:
             pf: dict
                 {pv, pf} where pv is in pvlist
         """
+
         pvlist = self.pv_on_feeder  # this is necessary when using surrogate PV forecasts
         curr_pf = {}
         pf_ub = {}
         pf_lb = {}
-        for pv in pvlist:
-            curr_pf[pv] = self.pf[pv]
-            pf_ub[pv] = self.pv[pv].pf_max
-            pf_lb[pv] = self.pv[pv].pf_min
+        if prior_pf is None:
+            for pv in pvlist:
+                curr_pf[pv] = self.pf[pv]
+                pf_ub[pv] = self.pv[pv].pf_max
+                pf_lb[pv] = self.pv[pv].pf_min
+        else:
+            curr_pf = prior_pf
 
-        change, new_pf, opt_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
+        print('curr_pf entering DSS.update_power_factors: %s' % curr_pf)
+        change, new_pf, opt_obj, prior_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
                                                        p_forecast, q_forecast,
                                                        pvlist, hour, sec,
                                                        pf_lb, pf_ub, stepsize,
                                                        numsteps, options)
         if change:
+            print('Changing DER PFs!')
             pf = new_pf
+            self.pf = pf  # store the PF values in the Feeder object as dict
         else:
             pf = curr_pf
 
         print('pvlist: %s' % pvlist)
         print('curr_pf: %s' % curr_pf)
         print('new_pf: %s' % new_pf)
+        print('self.pf: %s' % self.pf)
         print('PSO solution, pf: %s' % pf)
 
-        return pf, opt_obj
+        return pf, curr_pf, opt_obj, prior_obj, change
 

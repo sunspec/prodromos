@@ -4,7 +4,7 @@ Created on Tue Feb  5 13:58:12 2019
 
 @author: cwhanse
 
-2019-2-19 jjohns2@sancia.gov: Updated with communication interfaces
+2019-2-19 jjohns2@sandia.gov: Updated with communication interfaces
 """
 
 import pytz

@@ -225,7 +225,7 @@ class Feeder(object):
             self.DSS.set_load(bus, pmult=self.loads[bus].Pmult, qmult=self.loads[bus].Qmult)
 
     def update_power_factors(self, pvlist, pv_forecast, p_forecast, q_forecast, hour, sec, stepsize, numsteps, options,
-                             prior_pf=None):
+                             controllable_pv=None, prior_pf=None):
         """
         Determines new power factor settings.
         
@@ -252,6 +252,8 @@ class Feeder(object):
             numsteps: int
                 number of intervals to consider in power flow calculation
             options: VVar_opt
+            controllable_pv: list
+                optional parameter representing a subset of the pvlist that has controllable PF setpoints
             prior_pf: dict
                 optional parameter that can instantiate the PSO with a different starting prior PF solution
                 for debugging
@@ -262,24 +264,25 @@ class Feeder(object):
                 {pv, pf} where pv is in pvlist
         """
 
-        pvlist = self.pv_on_feeder  # this is necessary when using surrogate PV forecasts
+        if controllable_pv is None:
+            controllable_pv = pvlist
+
         curr_pf = {}
         pf_ub = {}
         pf_lb = {}
         if prior_pf is None:
-            for pv in pvlist:
+            for pv in controllable_pv:
                 curr_pf[pv] = self.pf[pv]
                 pf_ub[pv] = self.pv[pv].pf_max
                 pf_lb[pv] = self.pv[pv].pf_min
         else:
             curr_pf = prior_pf
 
-        print('curr_pf entering DSS.update_power_factors: %s' % curr_pf)
         change, new_pf, opt_obj, prior_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
                                                        p_forecast, q_forecast,
                                                        pvlist, hour, sec,
                                                        pf_lb, pf_ub, stepsize,
-                                                       numsteps, options)
+                                                       numsteps, options, controllable_pv)
         if change:
             print('Changing DER PFs!')
             pf = new_pf
@@ -288,6 +291,7 @@ class Feeder(object):
             pf = curr_pf
 
         print('pvlist: %s' % pvlist)
+        print('controllable_pv: %s' % controllable_pv)
         print('curr_pf: %s' % curr_pf)
         print('new_pf: %s' % new_pf)
         print('self.pf: %s' % self.pf)

@@ -25,39 +25,37 @@ password = "fake"
 # Create the Connected Energy API interface to get PV forecasts and issue DER PV setpoints
 api = CE_API(username=username, password=password)
 
+# DER devices represented by the EPRI PV simulators
+pv_sizes = [684000, 93353, 5393.75, 2242.35, 44555.7, 152388, 22180.9, 18413.3, 121307, 54932.6, 27494.8, 29935.9,
+            59594.4, 57685.9, 280784, 129058, 58194.7, 13166.9, 52328.8, 34853.4, 22675.2, 9156.04, 1012210,
+            1028690, 993513, 373251, 334862, 344033, 27142.1, 23568.6, 684]
+
 # Create dictionary of all PV systems and associated forecast information
 pvdict = {}
 use_surrogates = False
 if use_surrogates:
-    pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=1900, ac_capacity=3000, lat=35.05, lon=-106.54, alt=1657,
+    pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
                                    tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                                    forecast_method='persistence')
+    pv_count = 0
+    for pv in pv_sizes:
+        pv_count += 1
+        pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=93353, ac_capacity=93353, lat=35.05,
+                                            lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                            pf_min=-0.85, surrogateid='sunpower2201', forecast_method='persistence')
 
-    pvdict['pvsy1'] = PVobj('1 MW Plant', dc_capacity=1000, ac_capacity=1000, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            surrogateid='sunpower2201', forecast_method='persistence')
+        dss_to_phil_map['pvsy%d' % pv_count] = 'epri%d' % pv_count
 
-    pvdict['pvsy2'] = PVobj('10 MW Plant', dc_capacity=10000, ac_capacity=10000, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            surrogateid='sunpower2201', forecast_method='persistence')
-
-    pvdict['pvsy3'] = PVobj('258 kW Plant', dc_capacity=258, ac_capacity=258, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            surrogateid='sunpower2201', forecast_method='persistence')
 else:
-    pvdict['pvsy1'] = PVobj('epri3', dc_capacity=1000e3, ac_capacity=1000e3, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            forecast_method='persistence')
+    pv_count = 0
+    for pv in pv_sizes:
+        pv_count += 1
+        pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=93353, ac_capacity=93353, lat=35.05,
+                                            lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                            pf_min=-0.85, forecast_method='persistence')
 
-    pvdict['pvsy2'] = PVobj('epri2', dc_capacity=10000e3, ac_capacity=10000e3, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            forecast_method='persistence')
+        dss_to_phil_map['pvsy%d' % pv_count] = 'epri%d' % pv_count
 
-    pvdict['pvsy3'] = PVobj('epri1', dc_capacity=258e3, ac_capacity=258e3, lat=35.05, lon=-106.54, alt=1657,
-                            tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                            forecast_method='persistence')
-
-dss_to_phil_map = {'pvsy1': 'epri1', 'pvsy2': 'epri2', 'pvsy3': 'epri3'}
 
 cwd = os.getcwd()
 
@@ -78,8 +76,7 @@ results_filename = cwd + '\\Optimization %s.csv' % data_set_start_time
 csvfile = open(results_filename, 'x')
 csvfile.write('Time (s), Weighting 1 (W1), Weighting 2 (W2), Weighting 3 (W3), '
               'Violation Threshold, Acceptance Threshold, Objective Function Threshold, '
-              'Power Factor DER 1, Power Factor DER 2, Power Factor DER 3, '
-              'Reactive Power DER 1 (var), Reactive Power DER 2 (var), Reactive Power DER 3 (var), '
+              'Power Factor DER 1, Reactive Power DER 1 (var), '
               'Objective Function with Prior PFs, PF Change Bool, '
               'Optimization Function, PV Forecast, Power Forecast, Reactive Power Forecast\n')
 csvfile.close()
@@ -125,7 +122,8 @@ for opt_loop in range(n_iter):
     new_pf, prior_pf, opt_obj, prior_obj, change = feeder.update_power_factors(pvlist, pv_forecast,
                                                                                p_forecast, q_forecast, hour=0,
                                                                                sec=0, stepsize=stepsize,
-                                                                               numsteps=periods, options=options)
+                                                                               numsteps=periods, options=options,
+                                                                               controllable_pv=pvlist[0])
 
     print('The optimal power factors are %s' % new_pf)
 

@@ -186,7 +186,7 @@ class DSS(object):
         self.populate_results()
 
     def run(self, power_factors, pvlist, hour, sec, pv_profile, p_profile, q_profile,
-                    periods=1, stepsize='15m'):
+                    periods=1, stepsize='15m', controllable_pv=None):
         """
         Solves the circuit at time hour:sec, using the power factors, pv output and
         load in the input values.
@@ -216,7 +216,10 @@ class DSS(object):
         V : list
             len(V) = periods, each entry is a vector of bus voltage
         """
-    
+
+        if controllable_pv is None:
+            controllable_pv = pvlist
+
         npts_failure = [len(pv_profile[pv]) < periods for pv in pvlist]
         if any(npts_failure):
             print('pv_profiles: %s' % pv_profile)
@@ -240,8 +243,15 @@ class DSS(object):
             self.set_load(ld, pmult=p_profile[ld])
         for ld in q_profile.keys():
             self.set_load(ld, qmult=q_profile[ld])
-        for (pv, pf) in zip(pvlist, power_factors):
-            self.set_pv(pv, pv_profile[pv], pf)
+
+        # fewer controllable DER than PV forecasts, controllable DER must be the first in pvlist
+        if len(controllable_pv) <= len(pv_profile):
+            pf_pad_len = len(pv_profile) - len(controllable_pv)
+            for pad in range(1, pf_pad_len+1):
+                power_factors.append(1.0)  # fix all DER without communications/PF functions at unity PF
+
+            for (pv, pf) in zip(pvlist, power_factors):
+                self.set_pv(pv, pv_profile[pv], pf)
 
         for ii in range(0, periods):
             self.solve(commands)
@@ -269,9 +279,8 @@ class DSS(object):
             base : reference voltage, default 1.0 (for p.u. voltages)
         """
         power_factors = angle2pf(pf_angles)
-        if not all([kw in kwargs for kw in ['pvlist', 'hour', 'sec',
-                                            'pv_profile', 'p_profile', 'q_profile',
-                                            'stepsize', 'options']]):
+        if not all([kw in kwargs for kw in ['pvlist', 'hour', 'sec', 'pv_profile', 'p_profile', 'q_profile',
+                                            'stepsize', 'options', 'controllable_pv']]):
             raise ValueError('kwargs for pf_opt_obj incomplete')
         pvlist = kwargs['pvlist']
         hour = kwargs['hour']
@@ -289,13 +298,16 @@ class DSS(object):
         else:
             periods = 1
         options = kwargs['options']
-    
+        if 'controllable_pv' in kwargs:
+            controllable_pv = kwargs['controllable_pv']
+        else:
+            controllable_pv = pvlist
+
         alpha = options.threshold['violation']
         penalty = penalty2list(options.penalty)
     
-        V = self.run(power_factors, pvlist, hour, sec,
-                     pv_profile=pv_profile, p_profile=p_profile, q_profile=q_profile,
-                     periods=periods, stepsize=stepsize)
+        V = self.run(power_factors, pvlist, hour, sec, pv_profile=pv_profile, p_profile=p_profile, q_profile=q_profile,
+                     periods=periods, stepsize=stepsize, controllable_pv=controllable_pv)
 
         curr_obj = calc_obj(V, penalty, alpha, base_voltage, power_factors)
 
@@ -307,10 +319,13 @@ class DSS(object):
 
     def optimize_pf(self, hour, sec, pvlist, pf_lb, pf_ub, pv_profile,
                     p_profile, q_profile, stepsize, options, periods=1,
-                    base_voltage=1.0):
+                    base_voltage=1.0, controllable_pv=None):
         """
         Returns optimized power factor for each PV system
         """
+        if controllable_pv is None:
+            controllable_pv = pvlist
+
         # convert lb and ub to angles
         lb = [pf2angle(pf_lb[pv]) for pv in pvlist]
         ub = [pf2angle(pf_ub[pv]) for pv in pvlist]
@@ -318,15 +333,16 @@ class DSS(object):
         # Run particle swarm optimization routine
         xopt, fopt = pso(self._ps_pf_opt, lb, ub, kwargs={'dssobj': self, 'hour': hour, 'sec': sec, 'pvlist': pvlist,
             'pv_profile': pv_profile, 'p_profile': p_profile, 'q_profile': q_profile, 'base': base_voltage,
-            'options': options, 'periods': periods, 'stepsize': stepsize}, debug=options.debug,
-            swarmsize=options.swarmsize,  maxiter=options.maxiter, minstep=options.minstep, minfunc=options.minfunc)
+            'options': options, 'periods': periods, 'stepsize': stepsize, 'controllable_pv': controllable_pv},
+            debug=options.debug, swarmsize=options.swarmsize,  maxiter=options.maxiter, minstep=options.minstep,
+            minfunc=options.minfunc)
 
         pf = angle2pf(xopt)
         return pf, fopt
 
     def update_power_factors(self, curr_pf, pv_forecast, p_forecast, q_forecast,
                              pvlist, hour, sec, pf_lb, pf_ub, stepsize, numsteps,
-                             options, base=1.0):
+                             options, controllable_pv, base=1.0):
         """
         Updates power factors.
         
@@ -353,6 +369,8 @@ class DSS(object):
             pf_ub: dict
                 upper bound on power factor for each PV system
             options: VVar_optim
+            controllable_pv: list
+                optional parameter representing a subset of the pvlist that has controllable PF setpoints
         """
         # first solve for voltage using current settings
         change_pf = False
@@ -365,8 +383,9 @@ class DSS(object):
         # Calculate a starting value for the objective function. If change is small, don't change PFs.
         V = self.run(power_factors, pvlist, hour, sec,
                      pv_profile=pv_forecast, p_profile=p_forecast, q_profile=q_forecast,
-                     periods=numsteps, stepsize=stepsize)
+                     periods=numsteps, stepsize=stepsize, controllable_pv=controllable_pv)
         # print('Voltages from Prior Solution: %s' % V)
+        # TODO: Freeze LTCs and cap banks in OpenDSS at current settings so PSO doesn't change them
     
         if any([voltage_violation(v, options.threshold['accept'], base) for v in V]):
             print('--- voltage deviation outside target')
@@ -376,11 +395,10 @@ class DSS(object):
                                 power_factors)
             print('--- current obj value {}'.format(curr_obj))
             # previous settings are not good, find optimal settings
-            opt_pf, opt_obj = self.optimize_pf(hour, sec, pvlist, pf_lb, pf_ub,
-                                              pv_profile=pv_forecast,
-                                              p_profile=p_forecast, q_profile=q_forecast,
-                                              periods=numsteps, stepsize=stepsize,
-                                              options=options, base_voltage=base)
+            opt_pf, opt_obj = self.optimize_pf(hour, sec, pvlist, pf_lb, pf_ub, pv_profile=pv_forecast,
+                                               p_profile=p_forecast, q_profile=q_forecast, periods=numsteps,
+                                               stepsize=stepsize, options=options, base_voltage=base,
+                                               controllable_pv=controllable_pv)
 
             if options.debug:
                 print("--- optimized obj value {}".format(opt_obj))
@@ -399,14 +417,14 @@ class DSS(object):
                 print("--- not changing PF, couldn't improve on objective")
             prior_obj = curr_obj
 
-        final_V = self.run([power_factor_dict[pv] for pv in pvlist], pvlist, hour, sec, pv_profile=pv_forecast,
-                           p_profile=p_forecast, q_profile=q_forecast, periods=numsteps, stepsize=stepsize)
-
-        final_obj = calc_obj(final_V, penalty2list(options.penalty), options.threshold['violation'], base,
-                             power_factors)
-
+        # final_V = self.run([power_factor_dict[pv] for pv in pvlist], pvlist, hour, sec, pv_profile=pv_forecast,
+        #                    p_profile=p_forecast, q_profile=q_forecast, periods=numsteps, stepsize=stepsize)
+        #
+        # final_obj = calc_obj(final_V, penalty2list(options.penalty), options.threshold['violation'], base,
+        #                      power_factors)
+        #
         # print('Voltages from Optimal Solution: %s' % final_V)
-        print('curr_obj from Optimal Solution: %s' % final_obj)
+        # print('curr_obj from Optimal Solution: %s' % final_obj)
 
         return change_pf, power_factor_dict, opt_obj, prior_obj
 

@@ -172,10 +172,15 @@ for opt_loop in range(n_iter):
 
     # Write data from this optimization loop
     results = '%s, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, %0.5f, ' \
-              '%s, %s, %s, %s, %s \n' % (step_time, penalty['violation'], penalty['deviation'], penalty['power_factor'],
-                                         threshold['violation'], threshold['accept'], threshold['object'],
-                                         new_pf[pv_names[0]], new_q_values[pv_names[0]], prior_obj, change,
-                                         opt_obj, pv_forecast, p_forecast, q_forecast)
+              '%s, %s, %s, %s, %s, %s, %s, %s, %s \n' % (step_time, penalty['violation'],
+                                                          penalty['deviation'], penalty['power_factor'],
+                                                          threshold['violation'], threshold['accept'],
+                                                          threshold['object'], new_pf[pv_names[0]],
+                                                          new_pf[pv_names[1]], new_pf[pv_names[2]],
+                                                          new_q_values[pv_names[0]], new_q_values[pv_names[1]],
+                                                          new_q_values[pv_names[2]], prior_obj, change,
+                                                          opt_obj, pv_forecast,
+                                                          p_forecast, q_forecast)
 
     # open/close results file each time so the latest data is stored even with a crash
     csvfile = open(results_filename, 'a')

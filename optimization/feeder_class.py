@@ -252,8 +252,10 @@ class Feeder(object):
             numsteps: int
                 number of intervals to consider in power flow calculation
             options: VVar_opt
-            controllable_pv: list
-                optional parameter representing a subset of the pvlist that has controllable PF setpoints
+            controllable_pv: list, default None
+                optional parameter representing a subset of the pvlist that has
+                controllable PF setpoints. If None, then controllable_pv is set
+                equal to pvlist
             prior_pf: dict
                 optional parameter that can instantiate the PSO with a different starting prior PF solution
                 for debugging
@@ -276,7 +278,10 @@ class Feeder(object):
                 pf_ub[pv] = self.pv[pv].pf_max
                 pf_lb[pv] = self.pv[pv].pf_min
         else:
-            curr_pf = prior_pf
+            for pv in controllable_pv:
+                curr_pf[pv] = prior_pf[pv]
+                pf_ub[pv] = self.pv[pv].pf_max
+                pf_lb[pv] = self.pv[pv].pf_min
 
         change, new_pf, opt_obj, prior_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
                                                        p_forecast, q_forecast,

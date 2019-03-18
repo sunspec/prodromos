@@ -8,9 +8,9 @@ import matplotlib.text as text
 colorConverter = ColorConverter()
 import re
 import os
-from pyswarm import pso
 import itertools
 
+from optimization.pso_prodromos import pso
 
 # 2018-11-01 : modified by cwhanse@sandia.gov for python 3.5
 # 2019-2-19 : code clean up, expanded Load class - jjohns2@sandia.gov
@@ -258,6 +258,21 @@ class DSS(object):
             V.append(self.bus_voltage)
         return V
 
+    def _set_control_mode(self, value):
+        """ sets OpenDSS control mode
+        
+        Inputs
+        ------
+        value : string
+            'on' or 'off'
+        """
+        if value=='on':
+            self.circuit.Solution.ControlMode = 0
+        elif value=='off':
+            self.circuit.Solution.ControlMode = -1
+        else:
+            raise ValueError('{} is not valid, values must be ''on'' or ''off'''.format(value))
+
     def _ps_pf_opt(self, pf_angles, **kwargs):
         """
         Objective function for particle swarm optimization of power factors.
@@ -317,7 +332,7 @@ class DSS(object):
     
         return curr_obj
 
-    def optimize_pf(self, hour, sec, pvlist, pf_lb, pf_ub, pv_profile,
+    def optimize_pf(self, curr_pf, hour, sec, pvlist, pf_lb, pf_ub, pv_profile,
                     p_profile, q_profile, stepsize, options, periods=1,
                     base_voltage=1.0, controllable_pv=None):
         """
@@ -329,9 +344,9 @@ class DSS(object):
         # convert lb and ub to angles
         lb = [pf2angle(pf_lb[pv]) for pv in pvlist]
         ub = [pf2angle(pf_ub[pv]) for pv in pvlist]
-
+        pf0 = np.array([[pf2angle(curr_pf[pv]) for pv in pvlist]])
         # Run particle swarm optimization routine
-        xopt, fopt = pso(self._ps_pf_opt, lb, ub, kwargs={'dssobj': self, 'hour': hour, 'sec': sec, 'pvlist': pvlist,
+        xopt, fopt = pso(self._ps_pf_opt, lb, ub, x0=pf0, kwargs={'dssobj': self, 'hour': hour, 'sec': sec, 'pvlist': pvlist,
             'pv_profile': pv_profile, 'p_profile': p_profile, 'q_profile': q_profile, 'base': base_voltage,
             'options': options, 'periods': periods, 'stepsize': stepsize, 'controllable_pv': controllable_pv},
             debug=options.debug, swarmsize=options.swarmsize,  maxiter=options.maxiter, minstep=options.minstep,
@@ -375,27 +390,29 @@ class DSS(object):
         # first solve for voltage using current settings
         change_pf = False
         power_factors = [curr_pf[pv] for pv in pvlist]
-        power_factor_dict = curr_pf  # create pf solution dictionary
+        next_pf = curr_pf  # create pf solution dictionary
         opt_obj = 'No update'
         prior_obj = 'Unknown - voltages within deviation target'
-        # numsteps = len(pv_fc[list(pv_fc.keys())[0]])
+
+        # allow controls to float for initial state solution
+        self._set_control_mode(value='on')
 
         # Calculate a starting value for the objective function. If change is small, don't change PFs.
         V = self.run(power_factors, pvlist, hour, sec,
                      pv_profile=pv_forecast, p_profile=p_forecast, q_profile=q_forecast,
                      periods=numsteps, stepsize=stepsize, controllable_pv=controllable_pv)
-        # print('Voltages from Prior Solution: %s' % V)
-        # TODO: Freeze LTCs and cap banks in OpenDSS at current settings so PSO doesn't change them
-    
+
         if any([voltage_violation(v, options.threshold['accept'], base) for v in V]):
-            print('--- voltage deviation outside target')
+            print('--- voltage variation outside acceptable limit')
             print('--- PFs going into curr_obj solution: %s' % power_factors)
             curr_obj = calc_obj(V, penalty2list(options.penalty), 
                                 options.threshold['violation'], base,
                                 power_factors)
             print('--- current obj value {}'.format(curr_obj))
+            # lock controls to initial state solution
+            self._set_control_mode(value='off')
             # previous settings are not good, find optimal settings
-            opt_pf, opt_obj = self.optimize_pf(hour, sec, pvlist, pf_lb, pf_ub, pv_profile=pv_forecast,
+            opt_pf, opt_obj = self.optimize_pf(curr_pf, hour, sec, pvlist, pf_lb, pf_ub, pv_profile=pv_forecast,
                                                p_profile=p_forecast, q_profile=q_forecast, periods=numsteps,
                                                stepsize=stepsize, options=options, base_voltage=base,
                                                controllable_pv=controllable_pv)
@@ -411,7 +428,7 @@ class DSS(object):
                 # change pf
                 print('--- starting PF {}: obj value {}'.format(curr_pf, curr_obj))
                 print('--- change PF to {}: obj value {}'.format(opt_pf, opt_obj))
-                power_factor_dict = {pv: pf for (pv, pf) in zip(pvlist, opt_pf)}  # create pf solution dictionary
+                next_pf = {pv: pf for (pv, pf) in zip(pvlist, opt_pf)}  # create pf solution dictionary
                 change_pf = True
             else:
                 print("--- not changing PF, couldn't improve on objective")
@@ -426,7 +443,7 @@ class DSS(object):
         # print('Voltages from Optimal Solution: %s' % final_V)
         # print('curr_obj from Optimal Solution: %s' % final_obj)
 
-        return change_pf, power_factor_dict, opt_obj, prior_obj
+        return change_pf, next_pf, opt_obj, prior_obj
 
     def get_loads(self):
         """

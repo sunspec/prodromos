@@ -225,7 +225,7 @@ class Feeder(object):
             self.DSS.set_load(bus, pmult=self.loads[bus].Pmult, qmult=self.loads[bus].Qmult)
 
     def update_power_factors(self, pvlist, pv_forecast, p_forecast, q_forecast, hour, sec, stepsize, numsteps, options,
-                             controllable_pv=None, prior_pf=None):
+                             controllable_pv=None, prior_pf=None, base=1.0):
         """
         Determines new power factor settings.
         
@@ -257,10 +257,10 @@ class Feeder(object):
                 controllable PF setpoints. If None, then controllable_pv is set
                 equal to pvlist
             prior_pf: dict
-                optional parameter that can instantiate the PSO with a different starting prior PF solution
-                for debugging
-                {'pvsy1': -0.9989673952629021, 'pvsy2': -0.9908374137943107, 'pvsy3': 0.9994203489618271}
-
+                optional parameter that can instantiate the PSO with a 
+                different starting prior PF solution
+            base: float
+                target base voltage (p.u.)
         Returns:
             pf: dict
                 {pv, pf} where pv is in pvlist
@@ -287,7 +287,9 @@ class Feeder(object):
                                                        p_forecast, q_forecast,
                                                        pvlist, hour, sec,
                                                        pf_lb, pf_ub, stepsize,
-                                                       numsteps, options, controllable_pv)
+                                                       numsteps, options,
+                                                       controllable_pv,
+                                                       base=base)
         if change:
             print('Changing DER PFs!')
             pf = new_pf

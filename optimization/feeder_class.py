@@ -424,7 +424,11 @@ class Feeder(object):
                 controllable PF setpoints. If None, then controllable_pv is set
                 equal to pvlist
             prior_pf: dict
+<<<<<<< HEAD
                 optional parameter that can instantiate the PSO with a
+=======
+                optional parameter that can instantiate the PSO with a 
+>>>>>>> e36a062c25c5f557e66708d3bf881b0cfc75e48f
                 different starting prior PF solution
             base: float
                 target base voltage (p.u.)
@@ -451,9 +455,19 @@ class Feeder(object):
                 pf_ub[pv] = self.pv[pv].pf_max
                 pf_lb[pv] = self.pv[pv].pf_min
 
+<<<<<<< HEAD
         change, new_pf, opt_obj, prior_obj = self.DSS.update_power_factors(curr_pf, pv_forecast, p_forecast, q_forecast,
                                                                            pvlist, hour, sec, pf_lb, pf_ub, stepsize,
                                                                            numsteps, options, controllable_pv, base=base)
+=======
+        change, new_pf, opt_obj, prior_obj = self.DSS.update_power_factors(curr_pf, pv_forecast,
+                                                       p_forecast, q_forecast,
+                                                       pvlist, hour, sec,
+                                                       pf_lb, pf_ub, stepsize,
+                                                       numsteps, options,
+                                                       controllable_pv,
+                                                       base=base)
+>>>>>>> e36a062c25c5f557e66708d3bf881b0cfc75e48f
         if change:
             print('Changing DER PFs!')
             pf = new_pf

@@ -1,0 +1,140 @@
+
+--------------- Transferring files ... ------------------------------
+
+Transferring in ascii: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\pmu_in_cfg.xml (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ML605_2-EX-0029-2_2_6_61-32Aio_32DioSelectable-01-01.bin (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel1_State-Space.ssn (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel2_State-Space.ssn (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel3_State-Space.ssn (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel4_State-Space_ssn_sfun_sw1.ssn (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\NG_PV_Dynamic_DBUS_PMUs_SM_NG\OpREDHAWKtarget\Opal*Creator.data (SM_NG) ... OK.
+Transferring in binary: C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\NG_PV_Dynamic_DBUS_PMUs_SM_NG\OpREDHAWKtarget\settings.json (SM_NG) ... OK.
+
+--------------- Done transferring files -----------------------------
+
+
+Executing script /usr/opalrt/v11.3.5.119/common/python/rtlab/global/target_preload.py ... done
+Executing script /usr/opalrt/v11.3.5.119/common/python/rtlab/global/target_subsys_preload.py ... done
+
+Flashing FPGA #0 bitstream. This can take some time. Do not reset your target until flash_update completes.
+
+
+Flashing FPGA #0 bitstream : '/home/s1011745/c/users/detldaq/opal-rt/rt-labv11.3_workspace/gt_ng_pmu_dbus/models/ng_pv_dynamic_dbus_pmus/ng_pv_dynamic_dbus_pmus_sm_ng/ML605_2-EX-0029-2_2_6_61-32Aio_32DioSelectable-01-01.bin' ...
+WARNING: Flash programming was skipped because the same bitstream was already programmed in the FPGA.
+Note that you can set the User Variable FPGA_BITSTREAM_FORCE_OPTION to ON for forcing the reprogramming of the board.
+ 
+Root initialized: 10.1.2.3:25333/resources/root
+Model 'ng_pv_dynamic_dbus_p_1_sm_ng' compiled in RELEASE mode.
+8 CPUs active on this Computer
+libOpalR2016B.a : v11.3.5.119 (build = undefined)
+Subsystem SM_NG allocates 1 cores.
+Subsystem SS_DBUS allocates 1 cores.
+Subsystem SS_PMU allocates 1 cores.
+model ng_pv_dynamic_dbus_p_1_sm_ng assigned to logical cpu 1
+Monitoring is enabled
+RECV: connection to host established
+SEND: connection to host established
+A Unit delay is applied on status exchange.
+Display of standard output will be disabled
+Monitoring: start time = 0.000 ms, using CPU speed = 3200 MHz
+SSN: Structure ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel4_State-Space_ssn_sfun_sw1.ssn loaded
+
+SSN: Version : 1.9
+          SSN: File Name : ng_pv_dynamic_dbus_p_1_sm_ng
+          SSN: Structure SPS saved : Mon May 06 11:07:30 2019
+
+
+ssn_sfun_v1.c       : the SSN group #0 has 44 states
+ssn_sfun_v1.c       : the SSN group #1 has 22 states
+ssn_sfun_v1.c       : the SSN group #2 has 72 states
+ssn_sfun_v1.c       : the SSN group #3 has 22 states
+ssn_sfun_v1.c       : the SSN group #4 has 6 states
+ssn_sfun_v1.c       : the SSN group #5 has 0 states
+ssn_sfun_v1.c       : the SSN group #6 has 0 states
+ssn_sfun_v1.c       : the SSN group #7 has 0 states
+ssn_sfun_v1.c       : The S-function requires 166 states. 1000000 states are allowed on your license
+          TSync PCIe Ctrl : Initial model step size = 0.000125
+          SSN: Structure ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel3_State-Space.ssn loaded
+
+          SSN: Version : 1.9
+          SSN: File Name : ng_pv_dynamic_dbus_p_1_sm_ng
+          SSN: Structure SPS saved : Mon May 06 11:07:29 2019
+
+
+          ssn_sfun_v1.c       : the SSN group #0 has 3 states
+          ssn_sfun_v1.c       : The S-function requires 3 states. 999834 states are allowed on your license
+          SSN: Structure ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel2_State-Space.ssn loaded
+
+          SSN: Version : 1.9
+          SSN: File Name : ng_pv_dynamic_dbus_p_1_sm_ng
+          SSN: Structure SPS saved : Mon May 06 11:07:28 2019
+
+
+          ssn_sfun_v1.c       : the SSN group #0 has 3 states
+          ssn_sfun_v1.c       : The S-function requires 3 states. 999831 states are allowed on your license
+          SSN: Structure ng_pv_dynamic_dbus_p_1_sm_ng_powergui_EquivalentModel1_State-Space.ssn loaded
+
+          SSN: Version : 1.9
+          SSN: File Name : ng_pv_dynamic_dbus_p_1_sm_ng
+          SSN: Structure SPS saved : Mon May 06 11:07:28 2019
+
+
+          ssn_sfun_v1.c       : the SSN group #0 has 3 states
+          ssn_sfun_v1.c       : The S-function requires 3 states. 999828 states are allowed on your license
+WARNING:  ML605EX1 'ML605EX1 Ctrl': Hardware mismatch : ID for slot 2 / section B is 'EMPTY' (FF) instead of 'AIN' (C1)
+          SubSystem step size = 0.000125 sec. Status updated at every 1 local step.
+          XHP mode enabled on this CPU.
+          Synchronized with hardware timer.
+          Real-time SingleTasking mode.
+          RT-LAB license ok. Unlimited time license.
+          Snapshot taken (opng_pv_dynamic_dbus_p_sm_ng_0.snap).
+           [0]: PAUSE mode, IO set to pause value.
+          		Total of 0 Overrun detected.
+          		Wed May  8 08:11:27 2019
+
+Starting transfer of /home/s1011745/c/users/detldaq/opal-rt/rt-labv11.3_workspace/gt_ng_pmu_dbus/models/ng_pv_dynamic_dbus_pmus/ng_pv_dynamic_dbus_pmus_sm_ng/opng_pv_dynamic_dbus_p_sm_ng_0.snap...
+Transfer of /home/s1011745/c/users/detldaq/opal-rt/rt-labv11.3_workspace/gt_ng_pmu_dbus/models/ng_pv_dynamic_dbus_pmus/ng_pv_dynamic_dbus_pmus_sm_ng/opng_pv_dynamic_dbus_p_sm_ng_0.snap OK
+          XHP mode enabled
+           [1]: RUN mode, IO set to run value.
+          		Synchronized step size = 125 us.
+          		Wed May  8 08:11:59 2019
+
+          Main priority set to 99
+WARNING:   [129599999]: Stop Simulation detected.
+          XHP mode disabled
+WARNING:   [129600000]: STOP asked by the model.
+           [129600000]: Reset
+          		Total of 16 Overruns detected.
+          		Wed May  8 12:41:59 2019
+
+          
+
+
+WARNING:  16 OVERRUNS detected.
+          Reset done
+          SEND: connection to host closed
+Executing script /usr/opalrt/v11.3.5.119/common/python/rtlab/global/target_postreset.py ... done
+Executing script /usr/opalrt/v11.3.5.119/common/python/rtlab/global/target_subsys_postreset.py ... done
+
+
+--------------- Retrieving files ... ---------------------------------
+
+Setting local directory to C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\models\NG_PV_Dynamic_DBUS_PMUs\ng_pv_dynamic_dbus_pmus_sm_ng\OpREDHAWKtarget\... OK.
+Transferring in ascii mode /home/s1011745/c/users/detldaq/opal-rt/rt-labv11.3_workspace/gt_ng_pmu_dbus/models/ng_pv_dynamic_dbus_pmus/target_report.xml ... OK.
+
+--------------- Done retrieving files --------------------------------
+Executing script C:\OPAL-RT\RT-LAB\v11.3.5.119\common\python\rtlab\global\host_postreset.py ... done
+Traceback (most recent call last):
+  File "C:\OPAL-RT\RT-LAB\v11.3.5.119\common\python\rtlab\global\host_postreset.py", line 79, in <module>
+    main()
+  File "C:\OPAL-RT\RT-LAB\v11.3.5.119\common\python\rtlab\global\host_postreset.py", line 60, in main
+    rtlab_report.GenerateHostPostResetReport()
+  File "c:\opal-rt\rt-lab\v11.3.5.119\common\python\rtlab\report\rtlab_report.py", line 171, in GenerateHostPostResetReport
+    GenerateReport()
+  File "c:\opal-rt\rt-lab\v11.3.5.119\common\python\rtlab\report\rtlab_report.py", line 272, in GenerateReport
+    SetTextFile(doc, doc, 'report.log.Execution.%s.%s' % (subsystem,subsystem), loadLogFile)
+  File "c:\opal-rt\rt-lab\v11.3.5.119\common\python\rtlab\report\xmlutil.py", line 273, in SetTextFile
+    lines = ClearString(lines)
+  File "c:\opal-rt\rt-lab\v11.3.5.119\common\python\rtlab\report\xmlutil.py", line 252, in ClearString
+    return ''.join([c for c in text if (ord(c) >= 32 or c in allowed_control_characters)])
+MemoryError

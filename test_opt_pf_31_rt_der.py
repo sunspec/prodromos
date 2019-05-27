@@ -30,37 +30,47 @@ pv_sizes = [684000, 93353, 5393.75, 2242.35, 44555.7, 152388, 22180.9, 18413.3, 
             59594.4, 57685.9, 280784, 129058, 58194.7, 13166.9, 52328.8, 34853.4, 22675.2, 9156.04, 1012210,
             1028690, 993513, 373251, 334862, 344033, 27142.1, 23568.6, 684]
 
+pv_names = [1, 851, 838, 869, 857, 858, 859, 872, 873, 874, 848, 849, 850, 863, 864, 865, 845, 846, 847, 854, 855, 856,
+            842, 843, 844, 860, 861, 862, 866, 867, 868]
+
 # Create dictionary of all PV systems and associated forecast information
 pvdict = {}
+dss_to_phil_map = {}
 use_surrogates = False
 if use_surrogates:
-    pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
-                                   tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                                   forecast_method='persistence')
+    pvdict['sma1'] = PVobj('sma1', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
+                          tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85, forecast_method='persistence')
     pv_count = 0
     for pv in pv_sizes:
         pv_count += 1
-        pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=93353, ac_capacity=93353, lat=35.05,
+        pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=pv, ac_capacity=pv, lat=35.05,
                                             lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
-                                            pf_min=-0.85, surrogateid='sunpower2201', forecast_method='persistence')
+                                            pf_min=-0.85, surrogateid='sma', forecast_method='persistence')
 
         dss_to_phil_map['pvsy%d' % pv_count] = 'epri%d' % pv_count
 
 else:
     pv_count = 0
     for pv in pv_sizes:
+        dss_name = pv_names[pv_count]
         pv_count += 1
-        pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=93353, ac_capacity=93353, lat=35.05,
-                                            lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
-                                            pf_min=-0.85, forecast_method='persistence')
 
-        dss_to_phil_map['pvsy%d' % pv_count] = 'epri%d' % pv_count
+        if pv_count == 1:
+            pvdict['pvsy%d' % dss_name] = PVobj('epri%d' % pv_count, dc_capacity=pv, ac_capacity=pv, lat=35.05,
+                                                lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                                pf_min=-0.85, forecast_method='persistence')
+        else:
+            pvdict['pvsy%d' % dss_name] = PVobj('epri%d' % pv_count, dc_capacity=pv, ac_capacity=pv, lat=35.05,
+                                                lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                                pf_min=-0.85, surrogateid='pvsy1', forecast_method='persistence')
 
+        dss_to_phil_map['pvsy%d' % dss_name] = 'epri%d' % pv_count
 
 cwd = os.getcwd()
 
 # Setup feeder object which points to the local OpenDSS time series simulation
-feeder = Feeder(filename=cwd + "\\PNM_reduced_timeseries\\Master.DSS", pv=pvdict)
+feeder = Feeder(filename=cwd + "\\NG_reduced_timeseries\\Master.DSS", pv=pvdict)
+
 pvlist = feeder.pv_on_feeder
 loadlist = feeder.DSS.circuit.Loads.AllNames
 
@@ -107,23 +117,23 @@ for opt_loop in range(n_iter):
 
     # Voltage violation is at ANSI Range A
     # Optimization will not run if all voltages are within 0.2% of Vnom
-    # PFs will not change if the new PF do not improve objective function my 0.5%
-    threshold = {'violation': 0.05, 'accept': 0.002, 'object': 0.001}
+    # PFs will not change if the new PFs do not improve objective function by object%
+    threshold = {'violation': 0.05, 'accept': 0.002, 'object': 1.0e-7}
+
     debug = True
-    swarmsize = 40
+    swarmsize = 60
     maxiter = 10
     minstep = 0.001
     minfunc = 1e-6
 
-    options = PFOptim(penalty=penalty, threshold=threshold, debug=debug,
-                      swarmsize=swarmsize, maxiter=maxiter, minstep=minstep,
-                      minfunc=minfunc)
+    options = PFOptim(penalty=penalty, threshold=threshold, debug=debug, swarmsize=swarmsize, maxiter=maxiter,
+                      minstep=minstep, minfunc=minfunc)
 
     new_pf, prior_pf, opt_obj, prior_obj, change = feeder.update_power_factors(pvlist, pv_forecast,
                                                                                p_forecast, q_forecast, hour=0,
                                                                                sec=0, stepsize=stepsize,
                                                                                numsteps=periods, options=options,
-                                                                               controllable_pv=pvlist[0])
+                                                                               controllable_pv=pvlist)  # [pvlist[0]]
 
     print('The optimal power factors are %s' % new_pf)
 

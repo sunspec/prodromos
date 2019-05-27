@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project>
+    <General>
+        <att_name>GT_NG_PMU_DBUS</att_name>
+        <att_description>This is a project!</att_description>
+        <att_ip_address>10.1.2.2:25254</att_ip_address>
+        <att_hashcode>0F95A00E-06C4-41FE-9BCA-E82C9AF28C0D</att_hashcode>
+        <att_autosave>ON</att_autosave>
+        <att_filename>C:\Users\DETLDAQ\OPAL-RT\RT-LABv11.3_Workspace\GT_NG_PMU_DBUS\GT_NG_PMU_DBUS.llp</att_filename>
+    </General>
+    <Optionals>
+        <att_donotask_loadcfg_at_prjopen>0</att_donotask_loadcfg_at_prjopen>
+        <att_project_locked>0</att_project_locked>
+    </Optionals>
+    <Models>
+        <Model>
+            <Path>
+                <Relative>models/NG_PV_Dynamic_DBUS_PMUs/NG_PV_Dynamic_DBUS_PMUs.mdl</Relative>
+                <Absolute>C:/Users/DETLDAQ/OPAL-RT/RT-LABv11.3_Workspace/GT_NG_PMU_DBUS/models/NG_PV_Dynamic_DBUS_PMUs/NG_PV_Dynamic_DBUS_PMUs.mdl</Absolute>
+                <UNC>C:/Users/DETLDAQ/OPAL-RT/RT-LABv11.3_Workspace/GT_NG_PMU_DBUS/models/NG_PV_Dynamic_DBUS_PMUs/NG_PV_Dynamic_DBUS_PMUs.mdl</UNC>
+            </Path>
+        </Model>
+    </Models>
+</Project>

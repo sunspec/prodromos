@@ -1,0 +1,4 @@
+NG_PV_Dynamic_DBUS_PMUs/SM_NG,ng_pv_dynamic_dbus_p_1_sm_ng,1
+NG_PV_Dynamic_DBUS_PMUs/SC_Console,ng_pv_dynamic_dbus_pmus_2_sc_console,2
+NG_PV_Dynamic_DBUS_PMUs/SS_DBUS,ng_pv_dynamic_dbus_p_3_ss_dbus,3
+NG_PV_Dynamic_DBUS_PMUs/SS_PMU,ng_pv_dynamic_dbus_p_4_ss_pmu,4

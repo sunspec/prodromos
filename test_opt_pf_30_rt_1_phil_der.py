@@ -28,33 +28,42 @@ api = CE_API(username=username, password=password)
 # Create dictionary of all PV systems and associated forecast information
 pvdict = {}
 
-# Old Upton Rd. PV Site.  Use the 1st SunPower PVS5 to get PV production forecasts.  This surrogate isn't controlled to
-# ensure the forecast isn't affected by the reactive power control
-pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
+# Old Upton Rd. PV Site.  Use the SMA to get PV production forecasts.
+pvdict['sma1'] = PVobj('sma1', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
                                tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85, forecast_method='persistence')
-pvdict['pvsy1'] = PVobj('sunpower2201', dc_capacity=684000, ac_capacity=684000, lat=35.05, lon=-106.54, alt=1657,
+pvdict['pvsy1'] = PVobj('epri1', dc_capacity=684000, ac_capacity=684000, lat=35.05, lon=-106.54, alt=1657,
                         tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                        surrogateid='sunpower2201', forecast_method='persistence')
-dss_to_phil_map = {'pvsy1': 'sunpower2201'}
+                        surrogateid='sma1', forecast_method='persistence')
+dss_to_phil_map = {'pvsy1': 'sma1'}
 
 # Other simulated DER devices represented by the EPRI PV simulators
 pv_sizes = [93353, 5393.75, 2242.35, 44555.7, 152388, 22180.9, 18413.3, 121307, 54932.6, 27494.8, 29935.9, 59594.4,
             57685.9, 280784, 129058, 58194.7, 13166.9, 52328.8, 34853.4, 22675.2, 9156.04, 1012210, 1028690, 993513,
             373251, 334862, 344033, 27142.1, 23568.6, 684]
 
+pv_names = [1, 851, 838, 869, 857, 858, 859, 872, 873, 874, 848, 849, 850, 863, 864, 865, 845, 846, 847, 854, 855, 856,
+            842, 843, 844, 860, 861, 862, 866, 867, 868]
+
 pv_count = 1
 for pv in pv_sizes:
-    pv_count += 1  # start on DER#2 because the first is the PHIL system
-    pvdict['pvsy%d' % pv_count] = PVobj('epri%d' % pv_count, dc_capacity=93353, ac_capacity=93353, lat=35.05,
-                                        lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
-                                        pf_min=-0.85, forecast_method='persistence')
+    dss_name = pv_names[pv_count]
+    pv_count += 1
 
-    dss_to_phil_map['pvsy%d' % pv_count] = 'epri%d' % pv_count
+    if pv_count == 1:
+        pvdict['pvsy%d' % dss_name] = PVobj('epri%d' % pv_count, dc_capacity=pv, ac_capacity=pv, lat=35.05,
+                                            lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                            pf_min=-0.85, forecast_method='persistence')
+    else:
+        pvdict['pvsy%d' % dss_name] = PVobj('epri%d' % pv_count, dc_capacity=pv, ac_capacity=pv, lat=35.05,
+                                            lon=-106.54, alt=1657, tz=USMtn, tilt=35, azimuth=180, pf_max=0.85,
+                                            pf_min=-0.85, surrogateid='sma1', forecast_method='persistence')
+
+    dss_to_phil_map['pvsy%d' % dss_name] = 'epri%d' % pv_count
 
 cwd = os.getcwd()
 
 # Setup feeder object which points to the local OpenDSS time series simulation
-feeder = Feeder(filename=cwd + "\\PNM_reduced_timeseries\\Master.DSS", pv=pvdict)
+feeder = Feeder(filename=cwd + "\\NG_reduced_timeseries\\Master.DSS", pv=pvdict)
 pvlist = feeder.pv_on_feeder
 loadlist = feeder.DSS.circuit.Loads.AllNames
 
@@ -110,15 +119,16 @@ for opt_loop in range(n_iter):
     minstep = 0.001
     minfunc = 1e-6
 
+    print('PFOptim....')
     options = PFOptim(penalty=penalty, threshold=threshold, debug=debug,
-                      swarmsize=swarmsize, maxiter=maxiter, minstep=minstep,
-                      minfunc=minfunc)
+                      swarmsize=swarmsize, maxiter=maxiter, minstep=minstep, minfunc=minfunc)
 
+    print('update PFs....')
     new_pf, prior_pf, opt_obj, prior_obj, change = feeder.update_power_factors(pvlist, pv_forecast,
                                                                                p_forecast, q_forecast, hour=0,
                                                                                sec=0, stepsize=stepsize,
                                                                                numsteps=periods, options=options,
-                                                                               controllable_pv=pvlist[0])
+                                                                               controllable_pv=[pvlist[0]])
 
     print('The optimal power factors are %s' % new_pf)
 
@@ -140,14 +150,15 @@ for opt_loop in range(n_iter):
             excitation = "absorbingQ"
             # the expected reactive power based on the forecast VA level of the DERs
             new_q_values[pv_name] = -np.arccos(-new_pf[pv_name])*pv_forecast[pv_name][0]*pvdict[pv_name].ac_capacity
-        if pv_name == 'pvsys1':
-            # write the PFs to 9 of the SunPower PVSs.  The 10th is only used for forecasting.
-            sunpower_der = ['sunpower2202', 'sunpower2203', 'sunpower2204', 'sunpower2205', 'sunpower2206',
-                            'sunpower2207', 'sunpower2208', 'sunpower2209', 'sunpower2210']
-            for spower in sunpower_der:
-                der[spower] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
-        else:  # map back to EPRI simulated device
-            der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        # if pv_name == 'pvsys1':
+        #     # write the PFs to 9 of the SunPower PVSs.  The 10th is only used for forecasting.
+        #     sunpower_der = ['sunpower2202', 'sunpower2203', 'sunpower2204', 'sunpower2205', 'sunpower2206',
+        #                     'sunpower2207', 'sunpower2208', 'sunpower2209', 'sunpower2210']
+        #     for spower in sunpower_der:
+        #         der[spower] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        # else:  # map back to EPRI simulated device
+        #     der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
         pv_names.append(pv_name)
     print('The optimal reactive power values are %s' % new_q_values)
 

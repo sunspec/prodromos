@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project>
+    <General>
+        <att_name>Feeder_1_PV_Simulated</att_name>
+        <att_description></att_description>
+        <att_ip_address>10.1.2.2:25258</att_ip_address>
+        <att_hashcode>430D9EC0-3A02-4112-9270-A115CB608458</att_hashcode>
+        <att_autosave>ON</att_autosave>
+        <att_filename>C:\Users\DETLDAQ\OPAL-RT\RT-LABv2019.1_Workspace\Feeder_1_PV_Simulated\Feeder_1_PV_Simulated.llp</att_filename>
+    </General>
+    <Optionals>
+        <att_donotask_loadcfg_at_prjopen>0</att_donotask_loadcfg_at_prjopen>
+        <att_project_locked>0</att_project_locked>
+    </Optionals>
+    <Models>
+        <Model>
+            <Path>
+                <Relative>models/Feeder_1/Feeder_1.mdl</Relative>
+                <Absolute>C:/Users/DETLDAQ/OPAL-RT/RT-LABv2019.1_Workspace/Feeder_1_PV_Simulated/models/Feeder_1/Feeder_1.mdl</Absolute>
+                <UNC>C:/Users/DETLDAQ/OPAL-RT/RT-LABv2019.1_Workspace/Feeder_1_PV_Simulated/models/Feeder_1/Feeder_1.mdl</UNC>
+            </Path>
+        </Model>
+    </Models>
+</Project>

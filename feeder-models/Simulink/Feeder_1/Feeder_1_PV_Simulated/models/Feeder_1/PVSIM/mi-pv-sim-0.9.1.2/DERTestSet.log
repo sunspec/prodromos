@@ -1,0 +1,36 @@
+[ 3/20/2018 3:47:40 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/20/2018 3:47:43 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/4/2019 2:03:06 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/9/2019 1:27:46 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/28/2019 5:53:30 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/28/2019 5:53:34 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/28/2019 5:53:34 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/28/2019 5:53:44 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 3/28/2019 5:53:45 PM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 4/23/2019 10:21:43 AM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 5/8/2019 8:10:42 AM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()
+[ 5/8/2019 8:10:46 AM ] [ ERROR ]: Once the socket has been disconnected, you can only reconnect again asynchronously, and only to a different EndPoint.  BeginConnect must be called on a thread that won't exit until the operation has been completed.
+   at System.Net.Sockets.Socket.Connect(EndPoint remoteEP)
+   at PVDemo.dbus.DBusClient.StartClient()

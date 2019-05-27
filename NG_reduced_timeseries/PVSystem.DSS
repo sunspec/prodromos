@@ -1,0 +1,32 @@
+New "PVSystem.PVSy1" phases=3 kv=13.8 bus1=B_11 conn=wye irradiance=1 Pmpp=684 kVA=684 pf=1 %cutin=0.1 %cutout=0.1 Balanced=Yes varfollowinverter=true duty=PVprofile1
+
+New "PVSystem.PVSy838" phases=1 kv=7.96743 Pmpp=4.73814 kVA=5.39375 pf=-0.887235 irradiance=1 bus1=B_10.3 %cutin=0.1 %cutout=0.1 duty=PVprofile838
+New "PVSystem.PVSy842" phases=1 kv=7.96743 Pmpp=1001.99 kVA=1012.21 pf=-0.999811 irradiance=1 bus1=B_9.1 %cutin=0.1 %cutout=0.1 duty=PVprofile842
+New "PVSystem.PVSy843" phases=1 kv=7.96743 Pmpp=1018.49 kVA=1028.69 pf=0.999982 irradiance=1 bus1=B_9.2 %cutin=0.1 %cutout=0.1 duty=PVprofile843
+New "PVSystem.PVSy844" phases=1 kv=7.96743 Pmpp=983.676 kVA=993.513 pf=-0.999999 irradiance=1 bus1=B_9.3 %cutin=0.1 %cutout=0.1 duty=PVprofile844
+New "PVSystem.PVSy845" phases=1 kv=7.96743 Pmpp=57.6164 kVA=58.1947 pf=0.999964 irradiance=1 bus1=B_6.1 %cutin=0.1 %cutout=0.1 duty=PVprofile845
+New "PVSystem.PVSy846" phases=1 kv=7.96743 Pmpp=13.0347 kVA=13.1669 pf=-0.999857 irradiance=1 bus1=B_6.2 %cutin=0.1 %cutout=0.1 duty=PVprofile846
+New "PVSystem.PVSy847" phases=1 kv=7.96743 Pmpp=51.8079 kVA=52.3288 pf=0.999947 irradiance=1 bus1=B_6.3 %cutin=0.1 %cutout=0.1 duty=PVprofile847
+New "PVSystem.PVSy848" phases=1 kv=7.96743 Pmpp=27.2192 kVA=27.4948 pf=-0.999874 irradiance=1 bus1=B_4.1 %cutin=0.1 %cutout=0.1 duty=PVprofile848
+New "PVSystem.PVSy849" phases=1 kv=7.96743 Pmpp=29.6387 kVA=29.9359 pf=0.999973 irradiance=1 bus1=B_4.2 %cutin=0.1 %cutout=0.1 duty=PVprofile849
+New "PVSystem.PVSy850" phases=1 kv=7.96743 Pmpp=58.9978 kVA=59.5944 pf=-0.999889 irradiance=1 bus1=B_4.3 %cutin=0.1 %cutout=0.1 duty=PVprofile850
+New "PVSystem.PVSy851" phases=1 kv=7.96743 Pmpp=92.4287 kVA=93.353 pf=-1 irradiance=1 bus1=B_7.1 %cutin=0.1 %cutout=0.1 duty=PVprofile851
+New "PVSystem.PVSy854" phases=1 kv=7.96743 Pmpp=34.5083 kVA=34.8534 pf=-1 irradiance=1 bus1=B_8.1 %cutin=0.1 %cutout=0.1 duty=PVprofile854
+New "PVSystem.PVSy855" phases=1 kv=7.96743 Pmpp=22.4507 kVA=22.6752 pf=-0.999999 irradiance=1 bus1=B_8.2 %cutin=0.1 %cutout=0.1 duty=PVprofile855
+New "PVSystem.PVSy856" phases=1 kv=7.96743 Pmpp=9.06539 kVA=9.15604 pf=-1 irradiance=1 bus1=B_8.3 %cutin=0.1 %cutout=0.1 duty=PVprofile856
+New "PVSystem.PVSy857" phases=1 kv=7.967 Pmpp=44.0333 kVA=44.5557 pf=0.998158 irradiance=1 bus1=B_2.1 %cutin=0.1 %cutout=0.1 duty=PVprofile857
+New "PVSystem.PVSy858" phases=1 kv=7.967 Pmpp=150.415 kVA=152.388 pf=0.996927 irradiance=1 bus1=B_2.2 %cutin=0.1 %cutout=0.1 duty=PVprofile858
+New "PVSystem.PVSy859" phases=1 kv=7.967 Pmpp=21.2375 kVA=22.1809 pf=0.967042 irradiance=1 bus1=B_2.3 %cutin=0.1 %cutout=0.1 duty=PVprofile859
+New "PVSystem.PVSy860" phases=1 kv=7.96743 Pmpp=368.952 kVA=373.251 pf=-0.998367 irradiance=1 bus1=B_12.1 %cutin=0.1 %cutout=0.1 duty=PVprofile860
+New "PVSystem.PVSy861" phases=1 kv=7.96743 Pmpp=331.064 kVA=334.862 pf=-0.998544 irradiance=1 bus1=B_12.2 %cutin=0.1 %cutout=0.1 duty=PVprofile861
+New "PVSystem.PVSy862" phases=1 kv=7.96743 Pmpp=340.231 kVA=344.033 pf=-0.998839 irradiance=1 bus1=B_12.3 %cutin=0.1 %cutout=0.1 duty=PVprofile862
+New "PVSystem.PVSy863" phases=1 kv=7.967 Pmpp=57.0816 kVA=57.6859 pf=-0.999419 irradiance=1 bus1=B_5.1 %cutin=0.1 %cutout=0.1 duty=PVprofile863
+New "PVSystem.PVSy864" phases=1 kv=7.967 Pmpp=277.874 kVA=280.784 pf=0.999531 irradiance=1 bus1=B_5.2 %cutin=0.1 %cutout=0.1 duty=PVprofile864
+New "PVSystem.PVSy865" phases=1 kv=7.967 Pmpp=127.775 kVA=129.058 pf=-0.999964 irradiance=1 bus1=B_5.3 %cutin=0.1 %cutout=0.1 duty=PVprofile865
+New "PVSystem.PVSy866" phases=1 kv=7.96743 Pmpp=26.8714 kVA=27.1421 pf=-0.999926 irradiance=1 bus1=B_13.1 %cutin=0.1 %cutout=0.1 duty=PVprofile866
+New "PVSystem.PVSy867" phases=1 kv=7.96743 Pmpp=22.406 kVA=23.5686 pf=-0.960178 irradiance=1 bus1=B_13.2 %cutin=0.1 %cutout=0.1 duty=PVprofile867
+New "PVSystem.PVSy868" phases=1 kv=7.96743 Pmpp=67.7227 kVA=68.4 pf=0.999999 irradiance=1 bus1=B_13.3 %cutin=0.1 %cutout=0.1 duty=PVprofile868
+New "PVSystem.PVSy869" phases=1 kv=7.96743 Pmpp=2.21957 kVA=2.24235 pf=0.999738 irradiance=1 bus1=B_14.1 %cutin=0.1 %cutout=0.1 duty=PVprofile869
+New "PVSystem.PVSy872" phases=1 kv=7.96743 Pmpp=18.2212 kVA=18.4133 pf=0.999465 irradiance=1 bus1=B_3.1 %cutin=0.1 %cutout=0.1 duty=PVprofile872
+New "PVSystem.PVSy873" phases=1 kv=7.96743 Pmpp=119.379 kVA=121.307 pf=-0.993944 irradiance=1 bus1=B_3.2 %cutin=0.1 %cutout=0.1 duty=PVprofile873
+New "PVSystem.PVSy874" phases=1 kv=7.96743 Pmpp=53.8743 kVA=54.9326 pf=-0.990542 irradiance=1 bus1=B_3.3 %cutin=0.1 %cutout=0.1 duty=PVprofile874

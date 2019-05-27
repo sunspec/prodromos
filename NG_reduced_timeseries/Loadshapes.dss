@@ -1,0 +1,33 @@
+New loadshape.loadprofile1633 npts=288 minterval=5 Pmult=[file=BlankPerUnitProfiles.csv, col=2, header=yes] Qmult=[file=BlankPerUnitProfiles.csv, col=2, header=yes] Pbase=1 action=normalize
+
+New loadshape.PVprofile1 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile838 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile842 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile843 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile844 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile845 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile846 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile847 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile848 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile849 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile850 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile851 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile854 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile855 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile856 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile857 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile858 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile859 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile860 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile861 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile862 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile863 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile864 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile865 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile866 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile867 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile868 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile869 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile872 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile873 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize
+New loadshape.PVprofile874 npts=288 minterval=5 mult=[file=BlankPerUnitProfiles.csv, col=3, header=yes] Pbase=1 action=normalize

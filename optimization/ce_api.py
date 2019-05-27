@@ -15,8 +15,14 @@ class CE_API(object):
     def __init__(self, username=None, password=None):
 
         self.proxy = {'http': 'http://wwwproxy.sandia.gov:80'}
-        self.pf_url = "https://sandia-dm.cnrg.com/api/sandia/pf"
-        self.forecast_url = "https://sandia-dm.cnrg.com/api/pvanalysis/forecast/next"
+
+        # self.pf_url = "https://sandia-dm.cnrg.com/api/sandia/pf"
+        # self.forecast_url = "https://sandia-dm.cnrg.com/api/pvanalysis/forecast/next"
+        self.pf_url = "https://sandia2-dm.cnrg.com/api/sandia/pf"
+        self.forecast_url = "https://sandia2-dm.cnrg.com/api/pvanalysis/forecast/next"
+        self.pf_field_url = "https://sandia2-dm.cnrg.com/api/sandia/pf"
+        self.forecast_field_url = "https://sandia2-dm.cnrg.com/api/pvanalysis/forecast/next"
+
         self.usern = username
         self.passw = password
         self.auth = HTTPBasicAuth(self.usern, self.passw)
@@ -43,17 +49,45 @@ class CE_API(object):
 
         setpoints = []
         for der_id, pf_info in self.der.items():
-            self.n_der += 1
-            # print(der, pf_info)
-            setpoint = ({
-                         "der_number": der_id,  # e.g., "sunpower2202"
-                         "opendss_name": "some name 1",
-                         "reactive_power_target": -2000,
-                         "pf_setpoint_magnitude": pf_info["pf"],
-                         "excitation": pf_info["excitation"]
-                        })
 
-            setpoints.append(setpoint)
+            if der_id == 'ng1':  # special case to change the PF at the NG site
+
+                setpoint_field = ({
+                             "der_number": der_id,  # e.g., "sunpower2202"
+                             "opendss_name": "some name 1",
+                             "reactive_power_target": -2000,
+                             "pf_setpoint_magnitude": pf_info["pf"],
+                             "excitation": pf_info["excitation"]
+                            })
+
+                pf_cmd_field = {"solution_number": "1",
+                          "time_stamp": "2018-12-25T15:00:00",
+                          "number_of_der": "1",
+                          "setpoints": [setpoint_field]
+                          }
+
+                print(pf_cmd_field)
+
+                resp = requests.post(self.pf_field_url, json=pf_cmd_field, auth=self.auth,
+                                     proxies=self.proxy, headers=self.headers,
+                                     verify=False)
+
+                print('Data Posted to Field Site! statusMessage: %s' % resp)
+                print('resp.text: %s' % resp.text)
+
+            else:
+
+                self.n_der += 1
+                # print(der, pf_info)
+                setpoint = ({
+                             "der_number": der_id,  # e.g., "sunpower2202"
+                             "opendss_name": "some name 1",
+                             "reactive_power_target": -2000,
+                             "pf_setpoint_magnitude": pf_info["pf"],
+                             "excitation": pf_info["excitation"]
+                            })
+
+                setpoints.append(setpoint)
 
         pf_cmd = {"solution_number": "1",
                   "time_stamp": "2018-12-25T15:00:00",
@@ -66,6 +100,7 @@ class CE_API(object):
         resp = requests.post(self.pf_url, json=pf_cmd, auth=self.auth,
                              proxies=self.proxy, headers=self.headers,
                              verify=False)
+
         print('Data Posted! statusMessage: %s' % resp)
 
     def get_forecasts(self, der_ids):
@@ -81,9 +116,15 @@ class CE_API(object):
         for der_id in der_ids:
             payload = {'footprint': der_id}
             headers = {}
-            resp = requests.get(self.forecast_url, params=payload, 
-                                auth=self.auth, proxies=self.proxy,
-                                headers=headers, verify=False)
+            if der_id == 'ng1':
+                resp = requests.get(self.forecast_field_url, params=payload,
+                                    auth=self.auth, proxies=self.proxy,
+                                    headers=headers, verify=False)
+            else:
+                resp = requests.get(self.forecast_url, params=payload,
+                                    auth=self.auth, proxies=self.proxy,
+                                    headers=headers, verify=False)
+
             if resp.status_code == 200:
                 points = json.loads(resp.content.decode('utf-8'))
                 idx = []
@@ -103,14 +144,12 @@ if __name__ == "__main__":
 
     api = CE_API(username=username, password=password)
 
+    fc = api.get_forecasts(der_ids=['ng1'])
+    print(fc)
+
     der = {"epri1": {'excitation': "injectingQ", 'pf': -0.95, 'forecast': None},  # neg = Q4 (EPRI sign convention)
            "epri2": {'excitation': "injectingQ", 'pf': 0.93, 'forecast': None},
            "epri3": {'excitation': "injectingQ", 'pf': -0.88, 'forecast': None},
-           "sunpower2201": {'excitation': "injectingQ", 'pf': 1.0, 'forecast': None}}
-
-    fc = api.get_forecasts(der_ids=['sunpower2201'])
-    print(fc)
-
-#    api.set_pf(der=der)
-
+           "ng1": {'excitation': "injectingQ", 'pf': -0.90, 'forecast': None}}
+    api.set_pf(der=der)
 

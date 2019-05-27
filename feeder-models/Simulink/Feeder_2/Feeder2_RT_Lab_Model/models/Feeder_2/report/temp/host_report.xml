@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<item name="report">
+    <item name="diagnostic">
+        <item name="Execution - Host (S1011745)">
+            <property name="Computer name">
+                <value>S1011745</value>
+            </property>
+            <item name="Environment variables">
+                <item name="Path">
+                    <property name="0">
+                        <value>c:\opal-rt\rt-lab\v11.3.5.119\common\bin</value>
+                    </property>
+                    <property name="1">
+                        <value>c:/opal-rt/rt-lab/v11.3.5.119/common/ui/jre/bin/client</value>
+                    </property>
+                    <property name="2">
+                        <value>c:/opal-rt/rt-lab/v11.3.5.119/common/ui/jre/bin</value>
+                    </property>
+                    <property name="3">
+                        <value>c:/opal-rt/rt-lab/v11.3.5.119/common/ui/jre/lib/i386</value>
+                    </property>
+                    <property name="4">
+                        <value>c:\python27\</value>
+                    </property>
+                    <property name="5">
+                        <value>c:\python27\scripts</value>
+                    </property>
+                    <property name="6">
+                        <value>c:\windows\system32</value>
+                    </property>
+                    <property name="7">
+                        <value>c:\windows</value>
+                    </property>
+                    <property name="8">
+                        <value>c:\windows\system32\wbem</value>
+                    </property>
+                    <property name="9">
+                        <value>c:\windows\system32\windowspowershell\v1.0\</value>
+                    </property>
+                    <property name="10">
+                        <value>c:\windows\system32\openssh\</value>
+                    </property>
+                    <property name="11">
+                        <value>c:\program files\matlab\r2016b\bin</value>
+                    </property>
+                    <property name="12">
+                        <value>c:\tdm-gcc-64\bin</value>
+                    </property>
+                    <property name="13">
+                        <value>d:\for rachid\bin</value>
+                    </property>
+                    <property name="14">
+                        <value>c:\users\detldaq\appdata\local\programs\python\python37-32\scripts\</value>
+                    </property>
+                    <property name="15">
+                        <value>c:\users\detldaq\appdata\local\programs\python\python37-32\</value>
+                    </property>
+                    <property name="16">
+                        <value>c:\users\detldaq\appdata\local\microsoft\windowsapps</value>
+                    </property>
+                    <property name="17">
+                        <value>c:\program files\jetbrains\pycharm community edition 2018.3.5\bin</value>
+                    </property>
+                    <property name="18">
+                        <value>c:\users\detldaq\desktop\rachid\bin</value>
+                    </property>
+                    <property name="19">
+                        <value>c:\opal-rt\rt-lab\v11.3.5.119</value>
+                    </property>
+                    <property name="20">
+                        <value>C:\OPAL-RT\RT-LAB\v11.3.5.119\python\lib\site-packages\pywin32_system32</value>
+                    </property>
+                    <property name="21">
+                        <value>C:\OPAL-RT\RT-LAB\v11.3.5.119\python\lib\site-packages\numpy\.libs</value>
+                    </property>
+                    <property name="22">
+                        <value>C:\OPAL-RT\RT-LAB\v11.3.5.119\python\lib\site-packages\scipy\extra-dll</value>
+                    </property>
+                </item>
+                <item name="PYTHONPATH">
+                    <property name="0">
+                        <value>c:\opal-rt\rt-lab\v11.3.5.119\common\python</value>
+                    </property>
+                    <property name="1">
+                        <value>c:\opal-rt\rt-lab\v11.3.5.119\common\bin</value>
+                    </property>
+                </item>
+                <property name="RTLAB_ROOT">
+                    <value>C:\OPAL-RT\RT-LAB\v11.3.5.119\</value>
+                </property>
+            </item>
+            <item name="Network">
+                <textlog name="Network">
+                    <value>
+---------- Network interfaces list ----------
+NetworkInterfacesManager on S1011745: (3 interfaces)
+* Ethernet (index: 13)
+  - IP address: 10.1.2.2 [0x0a010202]
+  - MAC address: 48-4d-7e-ed-19-78
+  - type: Wired
+  - state: Up
+  ` subnet boundaries: [10.1.2.0, 10.1.2.255]
+  - found in subnet map: Ethernet
+* Loopback Pseudo-Interface 1 (index: 1)
+  - IP address: 127.0.0.1 [0x7f000001]
+  - MAC address: 
+  - type: Loopback
+  - state: Up
+  ` subnet boundaries: [127.0.0.0, 127.255.255.255]
+  - found in subnet map: Loopback Pseudo-Interface 1
+* Npcap Loopback Adapter (index: 10)
+  - IP address: 169.254.172.137 [0xa9feac89]
+  - MAC address: 02-00-4c-4f-4f-50
+  - type: Wired
+  - state: Up
+  ` subnet boundaries: [169.254.0.0, 169.254.255.255]
+  - found in subnet map: Npcap Loopback Adapter
+---------------------------------------------
+
+
+---------- Object name resolution ----------
+IP successfully selected: 127.0.0.1:2525
+
+--------------------------------------------
+
+---------- HTTP Client ----------
+HttpClient::connect 127.0.0.1: Success
+
+------------------------------
+
+---------- Looking for self in own subnet ----------
+10.1.2.2: Success, IP is avilable on interface Ethernet
+169.254.172.137: Success, IP is avilable on interface Npcap Loopback Adapter
+
+---------- Success ----------
+</value>
+                </textlog>
+            </item>
+            <item name="OS= Windows">
+                <property name="Other information">
+                    <value></value>
+                </property>
+                <property name="Release">
+                    <value>10</value>
+                </property>
+                <property name="Version">
+                    <value>10.0.17134</value>
+                </property>
+            </item>
+            <property name="User Name">
+                <value>DETLDAQ</value>
+            </property>
+        </item>
+    </item>
+</item>

@@ -28,24 +28,24 @@ api = CE_API(username=username, password=password)
 # Create dictionary of all PV systems and associated forecast information
 pvdict = {}
 
-# Use the 1st SunPower PVS5 to get PV production forecasts.  This surrogate isn't controlled to
-# ensure the forecast isn't affected by the reactive power control
-pvdict['sunpower2201'] = PVobj('sunpower2201', dc_capacity=2000, ac_capacity=3200, lat=35.05, lon=-106.54, alt=1657,
-                               tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                               forecast_method='persistence')
-pvdict['pvsy1'] = PVobj('sunpower2201', dc_capacity=258000, ac_capacity=258000, lat=35.05, lon=-106.54, alt=1657,
+# Use the SMA to get PV production forecasts.
+pvdict['sma1'] = PVobj('sma1', dc_capacity=3000, ac_capacity=3000, lat=35.05, lon=-106.54, alt=1657,
+                       tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
+                       forecast_method='persistence')
+
+pvdict['pvsy1'] = PVobj('epri1', dc_capacity=258000, ac_capacity=258000, lat=35.05, lon=-106.54, alt=1657,
                         tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
-                        surrogateid='sunpower2201', forecast_method='persistence')
+                        surrogateid='sma1', forecast_method='persistence')
 
 pvdict['pvsy2'] = PVobj('epri2', dc_capacity=10000e3, ac_capacity=10000e3, lat=35.05, lon=-106.54, alt=1657,
-                        tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85, surrogateid='sunpower2201',
+                        tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,  # surrogateid='sma1',
                         forecast_method='persistence')
 
-pvdict['pvsy3'] = PVobj('epri1', dc_capacity=258e3, ac_capacity=258e3, lat=35.05, lon=-106.54, alt=1657,
-                        tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85, surrogateid='sunpower2201',
+pvdict['pvsy3'] = PVobj('epri3', dc_capacity=1000e3, ac_capacity=1000e3, lat=35.05, lon=-106.54, alt=1657,
+                        tz=USMtn, tilt=35, azimuth=180, pf_max=0.85, pf_min=-0.85,
                         forecast_method='persistence')
 
-dss_to_phil_map = {'pvsy1': 'epri1', 'pvsy2': 'epri2', 'pvsy3': 'epri3'}
+dss_to_phil_map = {'pvsy1': 'sma1', 'pvsy2': 'epri2', 'pvsy3': 'epri3'}
 
 cwd = os.getcwd()
 
@@ -135,14 +135,15 @@ for opt_loop in range(n_iter):
             excitation = "absorbingQ"
             # the expected reactive power based on the forecast VA level of the DERs
             new_q_values[pv_name] = -np.arccos(-new_pf[pv_name])*pv_forecast[pv_name][0]*pvdict[pv_name].ac_capacity
-        if pv_name == 'pvsys1':
-            # write the PFs to 9 of the SunPower PVSs.  The 10th is only used for forecasting.
-            sunpower_der = ['sunpower2202', 'sunpower2203', 'sunpower2204', 'sunpower2205', 'sunpower2206',
-                            'sunpower2207', 'sunpower2208', 'sunpower2209', 'sunpower2210']
-            for spower in sunpower_der:
-                der[spower] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
-        else:  # map back to EPRI simulated device
-            der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        # if pv_name == 'pvsys1':
+        #     # write the PFs to 9 of the SunPower PVSs.  The 10th is only used for forecasting.
+        #     sunpower_der = ['sunpower2202', 'sunpower2203', 'sunpower2204', 'sunpower2205', 'sunpower2206',
+        #                     'sunpower2207', 'sunpower2208', 'sunpower2209', 'sunpower2210']
+        #     for spower in sunpower_der:
+        #         der[spower] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        # else:  # map back to EPRI simulated device
+        #     der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
+        der[dss_to_phil_map[pv_name]] = {'excitation': excitation, 'pf': new_pf[pv_name], 'forecast': None}
         pv_names.append(pv_name)
     print('The optimal reactive power values are %s' % new_q_values)
 

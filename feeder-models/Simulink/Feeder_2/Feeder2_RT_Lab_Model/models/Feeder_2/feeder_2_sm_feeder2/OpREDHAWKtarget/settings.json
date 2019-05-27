@@ -1,0 +1,12 @@
+[
+  {"version":2},
+  {
+    "Settings":
+    {
+      "libraryPath":"/usr/opalrt/common/bin/",
+      "masterNodeHttpPort":2525,
+      "modulesPath":"",
+      "sessionNodesHttpPortFirst":25250
+    }
+  }
+]

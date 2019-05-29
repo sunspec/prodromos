@@ -266,15 +266,9 @@ class DSS(object):
         value : string
             'on' or 'off'
         """
-<<<<<<< HEAD
         if value == 'on':
             self.circuit.Solution.ControlMode = 0
         elif value == 'off':
-=======
-        if value=='on':
-            self.circuit.Solution.ControlMode = 0
-        elif value=='off':
->>>>>>> e36a062c25c5f557e66708d3bf881b0cfc75e48f
             self.circuit.Solution.ControlMode = -1
         else:
             raise ValueError('{} is not valid, values must be ''on'' or ''off'''.format(value))
@@ -348,15 +342,9 @@ class DSS(object):
             controllable_pv = pvlist
 
         # convert lb and ub to angles
-<<<<<<< HEAD
         lb = [pf2angle(pf_lb[pv]) for pv in controllable_pv]
         ub = [pf2angle(pf_ub[pv]) for pv in controllable_pv]
         pf0 = np.array([[pf2angle(curr_pf[pv]) for pv in controllable_pv]])
-=======
-        lb = [pf2angle(pf_lb[pv]) for pv in pvlist]
-        ub = [pf2angle(pf_ub[pv]) for pv in pvlist]
-        pf0 = np.array([[pf2angle(curr_pf[pv]) for pv in pvlist]])
->>>>>>> e36a062c25c5f557e66708d3bf881b0cfc75e48f
         # Run particle swarm optimization routine
         xopt, fopt = pso(self._ps_pf_opt, lb, ub, x0=pf0, kwargs={'dssobj': self, 'hour': hour, 'sec': sec, 'pvlist': pvlist,
             'pv_profile': pv_profile, 'p_profile': p_profile, 'q_profile': q_profile, 'base': base_voltage,
@@ -401,11 +389,7 @@ class DSS(object):
         """
         # first solve for voltage using current settings
         change_pf = False
-<<<<<<< HEAD
         power_factors = [curr_pf[pv] for pv in controllable_pv]
-=======
-        power_factors = [curr_pf[pv] for pv in pvlist]
->>>>>>> e36a062c25c5f557e66708d3bf881b0cfc75e48f
         next_pf = curr_pf  # create pf solution dictionary
         opt_obj = 'No update'
         prior_obj = 'Unknown - voltages within deviation target'
